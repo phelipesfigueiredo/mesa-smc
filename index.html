@@ -791,6 +791,7 @@ function render(x){
    <div><small>Alvo 1</small><b class="ok">${fmt(b.tps[0]?.p)}</b><span>R:R ${fmt(b.rr,1)}</span></div>
   </div>
   ${rail}
+  ${(typeof OPEN!=='undefined'&&OPEN.data&&OPEN.data.orders.some(o=>o.symbol===$('sym').value.trim().toUpperCase()))?`<div class="lockline" style="border-color:rgba(10,132,255,.5)">🔵 Você tem uma ordem na Bitget nesta moeda. As linhas azuis/“BITGET” no gráfico são os valores reais dela; as outras são a análise atual.</div>`:''}
   ${b.locked?`<div class="lockline">🔒 Plano travado às ${new Date(b.locked.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${b.locked.filled?' · entrada já tocada':` · válido até ${new Date(b.locked.exp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`}. Os valores não mudam até o plano ser encerrado (stop, alvo, expiração ou sinal oposto). Nota agora: ${b.live.score}/10${b.live.vetos.length?' · atenção: '+esc(b.live.vetos[0]):''}.</div>`:x.lockEnded?`<div class="lockline">Plano anterior encerrado: ${esc(x.lockEnded.why)}.</div>`:''}
   ${BT&&BT.sym===$('sym').value.trim().toUpperCase()&&BT.tf===$('tf').value?`<div class="btline">Histórico destas regras aqui: <b>${BT.n}</b> trades · acerto ${fmt(BT.wr*100,0)}% · expectativa <b class="${BT.exp>0?'ok':'bad'}">${BT.exp>0?'+':''}${fmt(BT.exp,2)}R</b>${BT.n<30?' · amostra pequena':''}</div>`:''}
   <details class="planmore"><summary>Plano completo</summary>
@@ -834,6 +835,7 @@ function render(x){
   const pl=(price,color,title,style=2,w=1)=>lines.push(cs.createPriceLine({price,color,title,lineStyle:style,lineWidth:w,axisLabelVisible:true}));
   pl(b.entry,TH.up,b.dir===1?'COMPRA':'VENDA',0,2);pl(b.stop,'#d93b3b','STOP',0,2);
   b.tps.forEach((t,i)=>pl(t.p,'#1f9d55','TP'+(i+1),0,1));
+  if(typeof drawOrderLines==='function'&&typeof OPEN!=='undefined')drawOrderLines();
   (document.body.classList.contains('simple')?[]:zs.slice(0,6)).forEach(z=>{pl(z.top,z.dir===1?'rgba(31,157,85,.45)':'rgba(217,59,59,.4)',z.kind,1);pl(z.bot,z.dir===1?'rgba(31,157,85,.45)':'rgba(217,59,59,.4)','',1)});
   pl(x.eqm,'#aeaeb2','EQ',3);
   e21.setData(C.map((k,i)=>({time:k.t,value:x.E21[i]})));e200.setData(C.map((k,i)=>({time:k.t,value:x.E200[i]})));vw.setData(C.map((k,i)=>({time:k.t,value:x.VW[i]})));
@@ -943,9 +945,21 @@ $('bgtest').onclick=bgTest;
 const OPEN={busy:false,confirm:null,timer:null,data:null};
 async function bgOpenLoad(){
   if(!BG.ok||OPEN.busy)return;
-  try{OPEN.data=await bgcall('open?mode='+$('bgmode').value);bgOpenRender()}catch(e){bglog('Não consegui ler as posições: '+e.message)}
+  try{OPEN.data=await bgcall('open?mode='+$('bgmode').value);try{OPEN.watch=await bgcall('watch')}catch{OPEN.watch=[]}bgOpenRender()}catch(e){bglog('Não consegui ler as posições: '+e.message)}
+}
+let orderLines=[];
+function drawOrderLines(){
+  orderLines.forEach(l=>cs.removePriceLine(l));orderLines=[];
+  const d=OPEN.data,sym=$('sym').value.trim().toUpperCase();if(!d)return;
+  const add=(price,color,title,style=2)=>{if(price>0)orderLines.push(cs.createPriceLine({price,color,title,lineStyle:style,lineWidth:2,axisLabelVisible:true}))};
+  d.orders.filter(o=>o.symbol===sym).forEach(o=>{
+    add(o.price,'#0a84ff','ORDEM BITGET',0);add(o.sl,'#ff453a','SL BITGET');add(o.tp,'#30d158','TP FINAL BITGET');
+    const w=(OPEN.watch||[]).find(x=>x.orderId===o.orderId);(w?.partials||[]).forEach((p,i)=>add(p.price,'#30d158',`TP${i+1} (ao executar)`,3));
+  });
+  d.positions.filter(p=>p.symbol===sym).forEach(p=>{add(p.entry,'#0a84ff',`POSIÇÃO ${p.holdSide==='long'?'LONG':'SHORT'}`,0);if(p.liq)add(p.liq,'#ff9f0a','LIQUIDAÇÃO',1)});
 }
 function bgOpenRender(){
+  drawOrderLines();
   const d=OPEN.data;if(!d)return;
   if(!d.positions.length&&!d.orders.length){$('mycard').hidden=true;return}
   $('mycard').hidden=false;
@@ -971,7 +985,7 @@ function bgOpenRender(){
     </div>`}).join('');
   const ord=d.orders.map(o=>{const c=OPEN.confirm&&OPEN.confirm.k==='o'+o.orderId;
     return`<div class="pos ord"><div class="posh"><b>${esc(o.symbol.replace(/USDT$/,''))}</b><span class="mu">ordem limitada ${o.side==='buy'?'de compra':'de venda'}</span><span class="pnl mu">${fmt(o.size,5)} @ ${fmt(o.price)}</span></div>
-      ${o.tp||o.sl?`<div class="posm">${o.sl?`<span>Stop ${fmt(o.sl)}</span>`:''}${o.tp?`<span>TP ${fmt(o.tp)}</span>`:''}</div>`:''}
+      ${o.tp||o.sl?`<div class="posm">${o.sl?`<span>Stop ${fmt(o.sl)}</span>`:''}${o.tp?`<span>TP final ${fmt(o.tp)}</span>`:''}</div>`:''}${(()=>{const w=(OPEN.watch||[]).find(x=>x.orderId===o.orderId);return w&&w.partials?.length?`<div class="posm"><span>Quando executar, cria: ${w.partials.map((p,i)=>`TP${i+1} ${fmt(p.price)} (${fmt(p.size,5)})`).join(' · ')}</span></div>`:''})()}
       ${c?`<div class="confirm">Cancelar esta ordem?<button type="button" class="mini dang" data-do="cancel" data-o="${esc(o.orderId)}" data-s="${esc(o.symbol)}">Sim, cancelar</button><button type="button" class="mini" data-do="nope">Não</button></div>`
         :`<div class="closer"><button type="button" class="mini" data-do="askc" data-o="${esc(o.orderId)}">Cancelar ordem</button></div>`}</div>`}).join('');
   $('bgpos').innerHTML=pos+ord||'<div class="mu" style="font-size:.82rem">Nenhuma posição ou ordem aberta agora.</div>';
