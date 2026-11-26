@@ -155,8 +155,6 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
  :root:not([data-theme="light"]) body::after{mix-blend-mode:screen;opacity:.04;filter:invert(1)}
  :root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray{background:#141416;border-color:rgba(255,255,255,.06);box-shadow:0 20px 50px -20px rgba(0,0,0,.9)}
  :root:not([data-theme="light"]) .chip{background:#1c1c1e;border-color:rgba(255,255,255,.08);color:#f5f5f7}}
-:root[data-theme="dark"] header{filter:invert(1) hue-rotate(180deg);box-shadow:none!important;border-color:#111113!important}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header{filter:invert(1) hue-rotate(180deg);box-shadow:none!important;border-color:#111113!important}}
 :root[data-theme="dark"] .chip[aria-pressed="true"]{background:#f2f1ee}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{background:#f2f1ee;color:#111113;border-color:#f2f1ee}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .verdict,:root:not([data-theme="light"]) .panel.ink{background:#1c1c1e;border-color:rgba(255,255,255,.08)}}
@@ -427,6 +425,11 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 :root:not([data-theme="light"]) .bar{background:#141414!important}
 :root:not([data-theme="light"]) .warn{color:#ffd60a!important}.warn.bad,.vetos{color:#ff6b61!important}
 }
+
+:root[data-theme="dark"] header{background:#000!important;border:1px solid rgba(255,255,255,.12)!important;box-shadow:none!important;backdrop-filter:none!important}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header{background:#000!important;border:1px solid rgba(255,255,255,.12)!important;box-shadow:none!important;backdrop-filter:none!important}}
+:root[data-theme="dark"] header input, :root[data-theme="dark"] header select, :root[data-theme="dark"] header .seg, :root[data-theme="dark"] header .iconbtn{background:#000!important;border:1px solid rgba(255, :root[data-theme="dark"] 255, :root[data-theme="dark"] 255, :root[data-theme="dark"] .14)!important}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header input, :root:not([data-theme="light"]) header select, :root:not([data-theme="light"]) header .seg, :root:not([data-theme="light"]) header .iconbtn{background:#000!important;border:1px solid rgba(255, :root:not([data-theme="light"]) 255, :root:not([data-theme="light"]) 255, :root:not([data-theme="light"]) .14)!important}}
 </style>
 </head>
 <body>
