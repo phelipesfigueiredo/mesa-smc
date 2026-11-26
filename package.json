@@ -1,0 +1,9 @@
+{
+  "name": "mesa-smc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel de trade cripto com análise SMC, notícias e envio de ordens para a Bitget",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
