@@ -366,6 +366,13 @@ const chart=LightweightCharts.createChart($("chart"),{autoSize:true,layout:{back
  grid:{vertLines:{color:'#f0f3fa'},horzLines:{color:'#f0f3fa'}},crosshair:{mode:LightweightCharts.CrosshairMode.Normal,vertLine:{color:'#9598a1',width:1,style:3,labelBackgroundColor:'#131722'},horzLine:{color:'#9598a1',width:1,style:3,labelBackgroundColor:'#131722'}},
  rightPriceScale:{borderVisible:false,scaleMargins:{top:.08,bottom:.25}},timeScale:{borderVisible:false,timeVisible:true,secondsVisible:false,rightOffset:8,barSpacing:7},
  watermark:{visible:true,fontSize:56,horzAlign:'center',vertAlign:'center',color:'rgba(120,123,134,.08)',text:'BTCUSDT'},handleScroll:true,handleScale:true});
+/* horário de Brasília no gráfico (a Binance manda em UTC) */
+const BRT='America/Sao_Paulo';
+const fBRT=(t,o)=>new Intl.DateTimeFormat('pt-BR',{timeZone:BRT,...o}).format(new Date(t*1000));
+chart.applyOptions({
+  localization:{locale:'pt-BR',timeFormatter:t=>fBRT(t,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' BRT'},
+  timeScale:{tickMarkFormatter:(t,type)=>type===0?fBRT(t,{year:'numeric'}):type===1?fBRT(t,{month:'short'}).replace('.',''):type===2?fBRT(t,{day:'2-digit',month:'2-digit'}):fBRT(t,{hour:'2-digit',minute:'2-digit'})}
+});
 const cs=chart.addCandlestickSeries({upColor:'#1d1d1f',downColor:'#b4b4b9',wickUpColor:'#1d1d1f',wickDownColor:'#b4b4b9',borderVisible:false});
 const vs=chart.addHistogramSeries({priceScaleId:'vol',priceFormat:{type:'volume'},lastValueVisible:false,priceLineVisible:false});
 chart.priceScale('vol').applyOptions({scaleMargins:{top:.8,bottom:0}});
