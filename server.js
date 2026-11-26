@@ -253,16 +253,25 @@ async function tickWatch(w) {
     const pos = await positionSize(w);
     if (pos <= 0) { w.state = 'closed'; wlog(w, 'posição encerrada'); return; }
     if (!w.beDone && pos < w.size * 0.999) {
-      // TP1 executado: stop vai para o preço de entrada
+      // TP1 executado: stop vai para o 0x0 (entrada + taxas de ida e volta), assim, se voltar, sai sem perda.
+      const dir = w.holdSide === 'long' ? 1 : -1, fees = +(process.env.BE_FEE_PCT || 0.12) / 100;
+      const be0x0 = roundP(w.entry * (1 + dir * fees), w.pp), beEntry = roundP(w.entry, w.pp);
       try {
         const d = await bg(w.mode, 'GET', '/api/v2/mix/order/orders-plan-pending', { symbol: w.symbol, productType: w.productType, planType: 'profit_loss' });
         const list = d?.entrustedList || d || [];
         const sl = list.find(x => /loss/.test(x.planType || '') && (!w.hedge || (x.posSide || x.holdSide || '') === w.holdSide)) || list.find(x => /loss/.test(x.planType || ''));
         if (!sl) throw new Error('stop não encontrado');
-        await bg(w.mode, 'POST', '/api/v2/mix/order/modify-tpsl-order', null, { orderId: sl.orderId, marginCoin: w.marginCoin, productType: w.productType, symbol: w.symbol,
-          triggerPrice: String(roundP(w.entry, w.pp)), triggerType: 'mark_price', executePrice: '0', size: sl.size || '' });
-        w.beDone = true; wlog(w, `TP1 atingido, stop movido para o breakeven (${w.entry})`);
-      } catch (e) { wlog(w, `não consegui mover o stop para o breakeven: ${e.message}`); w.beDone = true; }
+        const mod = price => bg(w.mode, 'POST', '/api/v2/mix/order/modify-tpsl-order', null, { orderId: sl.orderId, marginCoin: w.marginCoin, productType: w.productType, symbol: w.symbol,
+          triggerPrice: String(price), triggerType: 'mark_price', executePrice: '0', size: sl.size || '' });
+        let used = be0x0;
+        // se o preço já voltou para perto da entrada, a Bitget recusa um stop "acima" do preço; aí usa a entrada exata
+        try { await mod(be0x0); } catch (e1) { used = beEntry; await mod(beEntry); wlog(w, `0x0 em ${be0x0} recusado (${e1.message}); usei a entrada`); }
+        w.beDone = true; w.bePrice = used; wlog(w, used === be0x0 ? `TP1 atingido: stop movido para o 0x0 em ${used} (entrada ${w.entry} + taxas)` : `TP1 atingido: stop movido para a entrada ${used} (o 0x0 com taxas foi recusado)`);
+      } catch (e) {
+        w.beTries = (w.beTries || 0) + 1;
+        wlog(w, `tentativa ${w.beTries} de mover o stop para o 0x0 falhou: ${e.message}`);
+        if (w.beTries >= 5) { w.beDone = true; wlog(w, 'desisti de mover o stop; ajuste manualmente na Bitget'); }
+      }
     }
   }
 }
@@ -321,7 +330,7 @@ if (require.main === module) http.createServer(async (req, res) => {
         const body = JSON.parse(raw);
         return send(res, 200, url.pathname.endsWith('close') ? await closePosition(body) : await cancelOrder(body));
       }
-      if (url.pathname === '/api/bitget/watch') return send(res, 200, WATCH.map(w => ({ symbol: w.symbol, orderId: w.orderId, state: w.state, partials: w.partials, beDone: w.beDone, log: (w.log || []).slice(-5) })));
+      if (url.pathname === '/api/bitget/watch') return send(res, 200, WATCH.map(w => ({ symbol: w.symbol, orderId: w.orderId, state: w.state, partials: w.partials, beDone: w.beDone, bePrice: w.bePrice || null, log: (w.log || []).slice(-5) })));
       if (url.pathname === '/api/bitget/debug') {
         const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo', out = {};
         const q = async (k, m, p, qs) => { try { out[k] = await bg(mode, m, p, qs); } catch (e) { out[k] = 'ERRO: ' + e.message; } };
