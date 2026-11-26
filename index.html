@@ -155,6 +155,33 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{background:#f2f1ee;color:#111113;border-color:#f2f1ee}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .verdict,:root:not([data-theme="light"]) .panel.ink{background:#1c1c1e;border-color:rgba(255,255,255,.08)}}
 :root[data-theme="dark"] .verdict,:root[data-theme="dark"] .panel.ink{background:#1c1c1e;border-color:rgba(255,255,255,.08)}
+.seg2{display:grid;grid-template-columns:1fr 1fr;background:rgba(255,255,255,.07);border-radius:12px;padding:3px;gap:3px}
+.seg2 button{background:transparent;border:0;color:#a1a1a6;padding:8px;border-radius:9px;font:600 .85rem var(--body)}
+.seg2 button[aria-pressed="true"]{background:#f5f5f3;color:#111113}
+#acLive[aria-pressed="true"]{background:#ff453a;color:#fff}
+.step{display:grid;gap:8px}
+.stepH{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:600 .82rem var(--body)}
+.stepH .mu{font:400 .74rem var(--mono)}
+.money{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.07);border-radius:14px;padding:6px 14px;border:1px solid rgba(255,255,255,.08)}
+.money span{font:600 1.1rem var(--display);color:#8e8e93}
+.bg .money input{flex:1;min-width:0;background:transparent;border:0;font:700 1.7rem var(--display);letter-spacing:-.02em;padding:6px 0;color:inherit}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.bg .quick button{padding:7px 0;border-radius:9px;font:600 .76rem var(--body);background:rgba(255,255,255,.07);border:1px solid transparent}
+.bg .quick button[aria-pressed="true"]{border-color:#f5f5f3}
+.levv{font:700 1.3rem var(--display)}
+#bglev{width:100%;accent-color:#f5f5f3;padding:0;background:transparent;border:0;height:24px}
+.ticks{display:flex;justify-content:space-between;font:400 .66rem var(--mono);color:#8e8e93;margin-top:-4px}
+.outcome{display:grid;gap:8px}
+.ogrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.obox{background:rgba(255,255,255,.06);border-radius:12px;padding:10px 12px;display:grid;gap:2px}
+.obox small{font:500 .64rem var(--body);letter-spacing:.08em;text-transform:uppercase;color:#8e8e93}
+.obox b{font:700 1.05rem var(--mono);font-variant-numeric:tabular-nums}
+.obox span{font:400 .72rem var(--mono);color:#8e8e93}
+.sentence{font:500 .88rem/1.45 var(--body)}
+.warn{font:500 .78rem/1.4 var(--body);padding:9px 12px;border-radius:10px;background:rgba(255,214,10,.12);color:#ffd60a}
+.warn.bad{background:rgba(255,69,58,.14);color:#ff6b61}
+.more summary{cursor:pointer;font:600 .8rem var(--body);color:#8e8e93;padding:4px 0}
+.more .form{margin-top:8px}
 </style>
 </head>
 <body>
@@ -188,15 +215,32 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <div class="meta"><span>Binance · 24h</span><span id="fxbtc">BTC em R$ —</span></div></div>
     <div class="verdict v-wait" id="verdict"><div class="mu">Analisando…</div></div>
     <div class="panel bg ink" id="bgcard">
-      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Operação automática · Bitget</h2><span class="pill2" id="bgconn">offline</span></div>
-      <div class="form">
-        <label>Conta<select id="bgmode"><option value="demo" selected>Demo (simulada)</option><option value="live">Real</option></select></label>
-        <label>Alavancagem<input id="bglev" type="number" value="5" min="1" max="20"></label>
-        <label>Margem<select id="bgmargin"><option value="isolated">Isolada</option><option value="crossed">Cruzada</option></select></label>
-        <label>Máx. ordens/dia<input id="bgmax" type="number" value="3" min="1" max="10"></label>
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Operar na Bitget</h2><span class="pill2" id="bgconn">offline</span></div>
+      <div class="seg2" role="group" aria-label="Conta">
+        <button type="button" id="acDemo" aria-pressed="true">Demo</button><button type="button" id="acLive" aria-pressed="false">Real</button>
       </div>
+      <select id="bgmode" hidden><option value="demo" selected>Demo</option><option value="live">Real</option></select>
+
+      <div class="step"><div class="stepH"><span>1 · Quanto da sua banca usar</span><span class="mu" id="bgavail">saldo —</span></div>
+        <div class="money"><span>US$</span><input id="bgamt" type="number" inputmode="decimal" min="1" step="1" value="100" aria-label="Valor de margem em dólares"></div>
+        <div class="quick" id="bgquick"><button type="button" data-p="10">10%</button><button type="button" data-p="25">25%</button><button type="button" data-p="50">50%</button><button type="button" data-p="risk">Pelo risco</button></div>
+      </div>
+
+      <div class="step"><div class="stepH"><span>2 · Alavancagem</span><b class="levv" id="bglevv">5x</b></div>
+        <input id="bglev" type="range" min="1" max="20" step="1" value="5" aria-label="Alavancagem">
+        <div class="ticks"><span>1x</span><span>5x</span><span>10x</span><span>15x</span><span>20x</span></div>
+      </div>
+
+      <div class="outcome" id="bgout"></div>
+
+      <details class="more"><summary>Mais opções</summary>
+        <div class="form">
+          <label>Margem<select id="bgmargin"><option value="isolated">Isolada (recomendado)</option><option value="crossed">Cruzada</option></select></label>
+          <label>Máx. ordens/dia<input id="bgmax" type="number" value="3" min="1" max="10"></label>
+        </div>
+      </details>
       <div class="list" id="bgprev"></div>
-      <div class="btns"><button type="button" id="bgtest">Testar conexão</button><button type="button" class="primary" id="bgsend" disabled>Enviar esta ordem</button></div>
+      <div class="btns"><button type="button" id="bgtest">Testar conexão</button><button type="button" class="primary" id="bgsend" disabled>Enviar ordem</button></div>
       <label class="switch">Modo automático<input type="checkbox" id="bgauto" disabled></label>
       <div class="note" id="bghint">Para conectar, rode o servidor local (server.js) e abra http://localhost:8787. Suas chaves ficam só no seu computador.</div>
       <div class="log" id="bglog"></div>
@@ -429,7 +473,7 @@ function render(x){
   if(mult===0||b.rr<2){cls='v-wait';head='ESPERAR';sub=b.rr<2&&mult>0?`R:R líquido ${fmt(b.rr,2)} abaixo de 1:2.`:`Confluência ${b.score}/10 é insuficiente. Abaixo está o cenário de ${side.toLowerCase()} que ativaria o trade.`}
   else if(b.inZone){cls=b.dir===1?'v-buy':'v-sell';head=b.dir===1?'COMPRAR AGORA':'VENDER AGORA';sub=`Preço dentro da zona. Setup ${b.score>=8?'A':'B (meia mão)'} · ${b.score}/10`}
   else{cls=b.dir===1?'v-buy':'v-sell';head=b.dir===1?'AGUARDAR PARA COMPRAR':'AGUARDAR PARA VENDER';sub=`Ordem em ${fmt(b.entry)}, aguardando o preço voltar à zona · ${b.score}/10${b.score<8?' · meia mão':''}`}
-  window.PLAN={sym:$('sym').value.trim().toUpperCase(),dir:b.dir,entry:b.entry,stop:b.stop,tp:b.tps[0]?.p,tps:b.tps.map(t=>t.p),size:pos/b.entry,usd:pos,risk:riskUsd,score:b.score,active:cls!=='v-wait',inZone:b.inZone,head};bgPreview();
+  window.__planPrev=window.PLAN;window.PLAN={sym:$('sym').value.trim().toUpperCase(),dir:b.dir,entry:b.entry,stop:b.stop,tp:b.tps[0]?.p,tps:b.tps.map(t=>t.p),size:pos/b.entry,usd:pos,risk:riskUsd,score:b.score,active:cls!=='v-wait',inZone:b.inZone,head};if(typeof amtMode!=='undefined'&&amtMode==='risk')setRiskAmount();bgPreview();
   const v=$('verdict');v.className='verdict '+cls;
   const tp1=b.tps[0]?.p,dir=b.dir===1?'sobe':'cai';
   const dtxt=`${dist>0?'+':''}${fmt(dist,2)}% do preço atual`;
@@ -525,16 +569,42 @@ const BG={ok:false,sent:{}};
 const onServer=location.protocol.startsWith('http');
 function bglog(t){const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString('pt-BR')+'  '+t;$('bglog').prepend(d)}
 async function bgcall(path,body){const r=await fetch('/api/bitget/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j}
+function bgCalc(){
+  const P=window.PLAN;if(!P)return null;
+  const lev=+$('bglev').value||1,amt=Math.max(+$('bgamt').value||0,0),notional=amt*lev,qty=notional/P.entry;
+  const fee=0.0006*2,move=d=>Math.abs(d-P.entry)/P.entry;
+  const loss=notional*(move(P.stop)+fee),gain=notional*(move(P.tp)-fee);
+  const liq=P.dir===1?P.entry*(1-1/lev*0.9):P.entry*(1+1/lev*0.9);
+  const liqBeforeStop=P.dir===1?liq>=P.stop:liq<=P.stop;
+  return{P,lev,amt,notional,qty,loss,gain,liq,liqBeforeStop};
+}
 function bgPreview(){
+  const c=bgCalc();if(!c)return;const {P}=c;
+  $('bglevv').textContent=c.lev+'x';
+  const cap=+$('cap').value||0,rp=+$('risk').value||1,lossPct=cap?c.loss/cap*100:0;
+  const side=P.dir===1?'<span class="ok">comprar (long)</span>':'<span class="bad">vender (short)</span>';
+  let warns='';
+  if(c.liqBeforeStop)warns+=`<div class="warn bad">Com ${c.lev}x a liquidação (~${fmt(c.liq)}) vem antes do stop. Diminua a alavancagem.</div>`;
+  if(BG.avail!=null&&c.amt>BG.avail)warns+=`<div class="warn bad">Valor maior que o saldo disponível (US$ ${fmt(BG.avail,2)}).</div>`;
+  if(lossPct>rp*1.0001&&cap)warns+=`<div class="warn">Se bater o stop, a perda (${fmt(lossPct,2)}% do capital) passa do seu risco de ${fmt(rp,1)}%. Toque em "Pelo risco" para ajustar.</div>`;
+  if(!P.active)warns+=`<div class="warn">Sem sinal agora. A ordem só libera quando o card de decisão mostrar compra ou venda.</div>`;
+  $('bgout').innerHTML=`<div class="sentence">Vai ${side} <b>${fmt(c.qty,5)} ${esc(P.sym.replace(/USDT$/,''))}</b> em <b>${fmt(P.entry)}</b>, uma posição de <b>US$ ${fmt(c.notional,0)}</b> (US$ ${fmt(c.amt,0)} × ${c.lev}).</div>
+   <div class="ogrid">
+    <div class="obox"><small>Se bater o stop</small><b class="bad">−US$ ${fmt(c.loss,2)}</b><span>em ${fmt(P.stop)} · ${fmt(lossPct,2)}% da banca</span></div>
+    <div class="obox"><small>Se bater o alvo</small><b class="ok">+US$ ${fmt(c.gain,2)}</b><span>em ${fmt(P.tp)}</span></div>
+   </div>${warns}`;
+  const ok=BG.ok&&P.active&&c.amt>0&&!c.liqBeforeStop&&!(BG.avail!=null&&c.amt>BG.avail);
+  $('bgsend').disabled=!ok;
+  $('bgsend').textContent=P.active?(P.dir===1?'Comprar':'Vender')+` · US$ ${fmt(c.amt,0)} × ${c.lev}x`:'Enviar ordem';
+  if($('bgauto').checked&&ok)bgSend(true);
+}
+function setRiskAmount(){
   const P=window.PLAN;if(!P)return;const lev=+$('bglev').value||1;
-  $('bgprev').innerHTML=[['Lado',P.dir===1?'<span class="ok">Long · compra</span>':'<span class="bad">Short · venda</span>'],['Entrada (limite)',fmt(P.entry)],['Stop loss',`<span class="bad">${fmt(P.stop)}</span>`],['Take profit',`<span class="ok">${fmt(P.tp)}</span>`],['Quantidade',fmt(P.size,5)],['Margem usada',`US$ ${fmt(P.usd/lev,2)}`],['Status',P.active?'<span class="ok">sinal ativo</span>':'<span class="mid">sem sinal</span>']]
-   .map(([k,v])=>`<div class="row"><span>${k}</span><span>${v}</span></div>`).join('');
-  $('bgsend').disabled=!(BG.ok&&P.active);
-  if($('bgauto').checked&&BG.ok&&P.active)bgSend(true);
+  $('bgamt').value=Math.max(1,Math.floor(P.usd/lev));
 }
 async function bgTest(){
   if(!onServer){$('bgconn').textContent='offline';return}
-  try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
+  try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;BG.avail=+j.available;if(amtMode==='risk')setRiskAmount();$('bgavail').textContent='saldo US$ '+fmt(BG.avail,2);$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
     $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));}
   catch(e){BG.ok=false;$('bgconn').textContent='erro';$('bgconn').className='pill2 bad';$('bghint').textContent='Falha: '+e.message;bglog('Erro: '+e.message)}
   bgPreview();
@@ -545,11 +615,21 @@ async function bgSend(auto){
   if(BG.sent[key])return;
   const cnt=Object.values(BG.sent).filter(d=>d===today).length;if(cnt>=+$('bgmax').value){if(!auto)bglog('Limite diário de ordens atingido');return}
   BG.sent[key]=today;
-  try{const j=await bgcall('order',{mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:P.size,sl:P.stop,tp:P.tp,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
+  try{const j=await bgcall('order',{mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
     bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId}`)}
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
-$('bgtest').onclick=bgTest;$('bgsend').onclick=()=>bgSend(false);$('bgmode').onchange=bgTest;$('bglev').oninput=bgPreview;
+$('bgtest').onclick=bgTest;$('bgsend').onclick=()=>bgSend(false);
+let amtMode='risk';
+const markQuick=()=>document.querySelectorAll('#bgquick button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===amtMode));
+$('bgquick').onclick=e=>{const p=e.target.dataset?.p;if(!p)return;amtMode=p;
+  if(p==='risk')setRiskAmount();else if(BG.avail!=null)$('bgamt').value=Math.floor(BG.avail*(+p)/100);
+  markQuick();bgPreview()};
+$('bgamt').oninput=()=>{amtMode='';markQuick();bgPreview()};
+$('bglev').oninput=()=>{if(amtMode==='risk')setRiskAmount();bgPreview()};
+const setAcct=m=>{$('bgmode').value=m;$('acDemo').setAttribute('aria-pressed',m==='demo');$('acLive').setAttribute('aria-pressed',m==='live');bgTest()};
+$('acDemo').onclick=()=>setAcct('demo');$('acLive').onclick=()=>setAcct('live');
+markQuick();
 $('bgauto').onchange=e=>{if(e.target.checked){if($('bgmode').value==='live'){$('bghint').textContent='Modo automático ligado na conta REAL. Ordens serão enviadas sozinhas quando houver sinal.'}bglog('Automático ligado')}else bglog('Automático desligado')};
 if(onServer)bgTest();else $('bghint').innerHTML='Para operar, rode <b>node server.js</b> e abra <b>http://localhost:8787</b>. Aberto como arquivo, o app só analisa.';
 
