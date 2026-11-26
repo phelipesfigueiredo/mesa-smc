@@ -63,9 +63,10 @@ async function probe(mode) {
   }
   try {
     const d = await bg(mode, 'GET', '/api/v3/account/assets');
-    const list = (d && (d.assets || d.list)) || (Array.isArray(d) ? d : []);
-    const u = list.find(x => String(x.coin || x.marginCoin || '').toUpperCase() === 'USDT') || {};
-    const av = +(u.available ?? u.availableBalance ?? (d && d.usdtEquity) ?? 0);
+    const list = (d && (d.assets || d.list || d.coins)) || (Array.isArray(d) ? d : []);
+    const u = list.find(x => String(x.coin || x.marginCoin || x.coinName || '').toUpperCase() === 'USDT') || {};
+    const num = v => (v === undefined || v === null || v === '' || isNaN(+v)) ? null : +v;
+    const av = [u.available, u.availableBalance, u.free, u.balance, u.equity, u.usdtEquity, d && d.usdtEquity, d && d.accountEquity, d && d.unionAvailable].map(num).find(v => v !== null && v > 0) || 0;
     tries.push(`UTA V3: ${av}`);
     if (av > 0) return { kind: 'uta', available: av, tries };
   } catch (e) { tries.push(`UTA V3: ${e.message}`); }
@@ -188,6 +189,17 @@ if (require.main === module) http.createServer(async (req, res) => {
     if ((origin && origin !== `http://${host}`) || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(res, 403, { error: 'Origem não permitida' });
     try {
       if (url.pathname === '/api/news') { const n = await getNews(); return send(res, 200, { items: n.data, errors: n.errors, at: n.at }); }
+      if (url.pathname === '/api/bitget/debug') {
+        const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo', out = {};
+        const q = async (k, m, p, qs) => { try { out[k] = await bg(mode, m, p, qs); } catch (e) { out[k] = 'ERRO: ' + e.message; } };
+        await q('v2_SUSDT', 'GET', '/api/v2/mix/account/accounts', { productType: 'SUSDT-FUTURES' });
+        await q('v2_USDT', 'GET', '/api/v2/mix/account/accounts', { productType: 'USDT-FUTURES' });
+        await q('v3_assets', 'GET', '/api/v3/account/assets');
+        await q('v3_settings', 'GET', '/api/v3/account/settings');
+        await q('spot_assets', 'GET', '/api/v2/spot/account/assets');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify(out, null, 2));
+      }
       if (url.pathname === '/api/bitget/status') return send(res, 200, await status(url.searchParams.get('mode')));
       if (url.pathname === '/api/bitget/order' && req.method === 'POST') {
         if (req.headers['content-type'] !== 'application/json') return send(res, 415, { error: 'JSON esperado' });
