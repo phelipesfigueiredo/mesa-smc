@@ -221,6 +221,25 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .step{grid-template-columns:minmax(0,1fr)}
 .money{min-width:0}
 .bg .money input{width:100%}
+.verdict{gap:10px;padding:18px}
+.verdict::before{display:none}
+.vrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.vlabel{display:flex;align-items:center}
+.score{font:700 1.15rem var(--display);font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:10px;background:rgba(255,255,255,.07)}
+.score small{font-size:.7rem;color:#8e8e93;font-weight:500}
+.score.ok{color:#4cd964}.score.mid{color:#ffd60a}.score.bad{color:#ff6b61}
+.vhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.verdict .big{font-size:1.45rem;letter-spacing:-.03em}
+.side{font:700 .62rem var(--body);letter-spacing:.12em;padding:4px 8px;border-radius:7px}
+.side.l{background:rgba(52,199,89,.16);color:#4cd964}.side.s{background:rgba(255,69,58,.16);color:#ff6b61}
+.hint{font:400 .84rem/1.4 var(--body);color:#c7c7cc}
+.keynums div{gap:0;padding:8px 10px}
+.keynums span{font:400 .66rem var(--mono);color:#8e8e93}
+.rail{position:relative;height:14px;margin:0 6px}
+.rail .rl{position:absolute;left:0;right:0;top:5px;height:4px;border-radius:9px;background:linear-gradient(90deg,var(--a),var(--b));opacity:.55}
+.rail .d{position:absolute;top:3px;width:2px;height:8px;border-radius:2px;transform:translateX(-50%)}
+.rail .st{background:#ff6b61}.rail .en{background:#f5f5f3;height:10px;top:2px}.rail .tp{background:#4cd964}
+.rail .now{top:1px;width:12px;height:12px;border-radius:50%;background:#f5f5f3;box-shadow:0 0 0 3px rgba(255,255,255,.18)}
 </style>
 </head>
 <body>
@@ -521,21 +540,25 @@ function render(x){
   const v=$('verdict');v.className='verdict '+cls;
   const tp1=b.tps[0]?.p,dir=b.dir===1?'sobe':'cai';
   const dtxt=`${dist>0?'+':''}${fmt(dist,2)}% do preço atual`;
-  let summary;
-  if(cls==='v-wait')summary=`<b>Não faça nada agora.</b> O sinal ainda está fraco (${b.score} de 10 pontos). Se o preço chegar a <b>${fmt(b.entry)}</b> (${dtxt}) e a nota passar de 6, a ideia seria <b>${act}</b>.`;
-  else if(b.inZone)summary=`<b>${b.dir===1?'Compre':'Venda'} agora, perto de ${fmt(b.entry)}.</b> Se o preço for até <b>${fmt(b.stop)}</b>, saia com prejuízo de no máximo <b>US$ ${fmt(riskUsd,0)}</b>. Realize parte do lucro em <b>${fmt(tp1)}</b>.`;
-  else summary=`<b>Deixe uma ordem para ${act} em ${fmt(b.entry)}</b> (${dtxt}). Stop em <b>${fmt(b.stop)}</b>, primeiro alvo em <b>${fmt(tp1)}</b>. Se o preço não chegar lá, não entre.`;
+  const ago=Math.abs(dist)<0.05?'no preço':`${dist>0?'+':''}${fmt(dist,2)}% do preço`;
+  let hint;
+  if(cls==='v-wait')hint=b.rr<2&&mult>0?`Retorno baixo (R:R ${fmt(b.rr,1)}). Não vale o risco.`:`Sinal fraco. Só vale ${act} se chegar a ${fmt(b.entry)} e a nota subir.`;
+  else if(b.inZone)hint=`Preço já está na zona. ${b.score>=8?'Setup forte, risco cheio.':'Setup médio, use metade do risco.'}`;
+  else hint=`Coloque uma ordem limitada e espere o preço vir até a entrada.${b.score<8?' Use metade do risco.':''}`;
   const pts=[b.stop,b.entry,px,...b.tps.map(t=>t.p)],mn=Math.min(...pts),mx=Math.max(...pts),pos_=p=>((p-mn)/(mx-mn||1)*100).toFixed(1)+'%';
-  const ladder=`<div class="ladder" style="--lgL:${b.dir===1?'var(--short)':'var(--long)'};--lgR:${b.dir===1?'var(--long)':'var(--short)'}"><div class="track"></div>
-   <div class="mk now" style="left:${pos_(b.stop)};color:#ff6b61"><i style="width:2px;height:14px;border-radius:2px;background:#ff6b61;box-shadow:none"></i>STOP</div><div class="mk" style="left:${pos_(b.entry)};color:#f5f5f3">ENTRADA<i></i></div>
-   ${b.tps.map((t,i)=>`<div class="mk" style="left:${pos_(t.p)};color:#4cd964">${i+1}<i></i></div>`).join('')}
-   <div class="mk now" style="left:${pos_(px)}"><i></i>AGORA</div></div>`;
-  v.innerHTML=`<div class="vtop"><span class="stepn">1</span><span class="vlabel">Sinal agora · ${esc($('sym').value.toUpperCase())}</span></div><div class="big">${head}</div><div class="summary">${summary}</div>${ladder}
+  const rail=`<div class="rail" title="Onde o preço está agora em relação ao stop, à entrada e aos alvos"><div class="rl" style="--a:${b.dir===1?'var(--short)':'var(--long)'};--b:${b.dir===1?'var(--long)':'var(--short)'}"></div>
+   <i class="d st" style="left:${pos_(b.stop)}"></i><i class="d en" style="left:${pos_(b.entry)}"></i>${b.tps.map(t=>`<i class="d tp" style="left:${pos_(t.p)}"></i>`).join('')}<i class="d now" style="left:${pos_(px)}"></i></div>`;
+  const sideTag=`<span class="side ${b.dir===1?'l':'s'}">${b.dir===1?'LONG':'SHORT'}</span>`;
+  const scoreCls=b.score>=8?'ok':b.score>=6?'mid':'bad';
+  v.innerHTML=`<div class="vrow"><span class="vlabel"><span class="stepn">1</span>Sinal · ${esc($('sym').value.toUpperCase())}</span><span class="score ${scoreCls}" title="Nota de confluência (0 a 10). 8+: forte · 6-7: médio · abaixo de 6: não operar">${b.score}<small>/10</small></span></div>
+  <div class="vhead"><div class="big">${head}</div>${cls==='v-wait'?'':sideTag}</div>
+  <div class="hint">${hint}</div>
   <div class="keynums">
-   <div><small>Entrada</small><b>${fmt(b.entry)}</b></div>
-   <div><small>Stop</small><b class="bad">${fmt(b.stop)}</b></div>
-   <div><small>Alvo 1</small><b class="ok">${fmt(b.tps[0]?.p)}</b></div>
+   <div><small>${cls==='v-wait'?'Entrada (se ativar)':'Entrada'}</small><b>${fmt(b.entry)}</b><span>${ago}</span></div>
+   <div><small>Stop</small><b class="bad">${fmt(b.stop)}</b><span>−${fmt(stopPct*100,2)}%</span></div>
+   <div><small>Alvo 1</small><b class="ok">${fmt(b.tps[0]?.p)}</b><span>R:R ${fmt(b.rr,1)}</span></div>
   </div>
+  ${rail}
   <details class="planmore"><summary>Plano completo</summary>
   <dl class="plan">
    <dt>Preço agora</dt><dd>${fmt(px)}</dd>
