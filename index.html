@@ -324,6 +324,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .toast{position:relative;padding-right:34px}
 .toast .tx{position:absolute;top:6px;right:8px;background:none;border:0;color:#8e8e93;font:400 1.2rem/1 var(--body);cursor:pointer;padding:2px 6px}
 .toast .tx:hover{color:#f5f5f3}
+.boxlayer{position:absolute;inset:0;pointer-events:none;z-index:3}
+#chart{position:relative}
 </style>
 </head>
 <body>
@@ -447,6 +449,53 @@ const vs=chart.addHistogramSeries({priceScaleId:'vol',priceFormat:{type:'volume'
 chart.priceScale('vol').applyOptions({scaleMargins:{top:.8,bottom:0}});
 const e21=chart.addLineSeries({color:'#1d1d1f',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
 const e200=chart.addLineSeries({color:'#c7c7cc',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+/* ---------- caixas de Order Block / FVG desenhadas sobre o gráfico ---------- */
+const BOX={zones:[],eq:[],dirty:true,cv:null,ctx:null};
+(function(){
+  const host=$('chart');const cv=document.createElement('canvas');cv.className='boxlayer';host.appendChild(cv);BOX.cv=cv;BOX.ctx=cv.getContext('2d');
+  const mark=()=>{BOX.dirty=true};
+  chart.timeScale().subscribeVisibleLogicalRangeChange(mark);chart.subscribeCrosshairMove(mark);
+  new ResizeObserver(mark).observe(host);
+  host.addEventListener('wheel',mark,{passive:true});host.addEventListener('pointermove',mark,{passive:true});
+  const loop=()=>{if(BOX.dirty){BOX.dirty=false;drawBoxes()}requestAnimationFrame(loop)};requestAnimationFrame(loop);
+  setInterval(mark,400);
+})();
+function drawBoxes(){
+  const cv=BOX.cv,host=$('chart'),dpr=window.devicePixelRatio||1,W=host.clientWidth,Hh=host.clientHeight;
+  if(cv.width!==W*dpr||cv.height!==Hh*dpr){cv.width=W*dpr;cv.height=Hh*dpr;cv.style.width=W+'px';cv.style.height=Hh+'px'}
+  const g=BOX.ctx;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,Hh);
+  if(!C.length)return;
+  const ts=chart.timeScale(),right=W-chart.priceScale('right').width(),paneH=Hh-ts.height();
+  g.save();g.beginPath();g.rect(0,0,right,paneH);g.clip();
+  const dark=isDark();
+  const COL={OB1:['rgba(41,98,255,.16)','rgba(41,98,255,.55)','#2962ff'],OB0:['rgba(242,54,69,.15)','rgba(242,54,69,.55)','#f23645'],
+             FVG1:['rgba(8,153,129,.12)','rgba(8,153,129,.35)','#089981'],FVG0:['rgba(242,54,69,.09)','rgba(242,54,69,.3)','#f23645']};
+  for(const z of BOX.zones){
+    let x1=ts.timeToCoordinate(z.t);if(x1===null){const first=C[0].t;x1=z.t<first?0:null}if(x1===null)continue;
+    let x2=z.endT?ts.timeToCoordinate(z.endT):null;if(x2===null)x2=right;
+    const y1=cs.priceToCoordinate(z.top),y2=cs.priceToCoordinate(z.bot);if(y1===null||y2===null)continue;
+    const c=COL[z.kind+(z.dir===1?'1':'0')]||COL.OB1,top=Math.min(y1,y2),hgt=Math.max(1,Math.abs(y2-y1));
+    g.fillStyle=c[0];g.fillRect(x1,top,x2-x1,hgt);
+    g.strokeStyle=c[1];g.lineWidth=1;g.setLineDash(z.kind==='FVG'?[3,3]:[]);g.strokeRect(x1+.5,top+.5,x2-x1-1,hgt-1);g.setLineDash([]);
+    if(hgt>=9){const lbl=z.kind==='OB'?(z.dir===1?'Bull OB':'Bear OB')+(z.mit?' (testado)':''):(z.dir===1?'FVG +':'FVG −');
+      g.font='600 10px -apple-system,BlinkMacSystemFont,Inter,sans-serif';g.textBaseline='middle';g.textAlign='right';g.fillStyle=dark?'rgba(245,245,247,.85)':c[2];
+      g.fillText(lbl,x2-6,top+Math.min(hgt/2,9))}
+  }
+  // topos/fundos iguais (EQH / EQL): linha pontilhada entre os dois pivôs
+  for(const e of BOX.eq){
+    const xa=ts.timeToCoordinate(e.t1),xb=ts.timeToCoordinate(e.t2),y=cs.priceToCoordinate(e.p);if(xa===null||xb===null||y===null)continue;
+    g.strokeStyle=dark?'rgba(245,245,247,.55)':'rgba(29,29,31,.55)';g.setLineDash([2,3]);g.beginPath();g.moveTo(xa,y);g.lineTo(xb,y);g.stroke();g.setLineDash([]);
+    g.font='600 9px -apple-system,BlinkMacSystemFont,Inter,sans-serif';g.textAlign='center';g.textBaseline=e.side>0?'bottom':'top';g.fillStyle=dark?'rgba(245,245,247,.8)':'rgba(29,29,31,.75)';
+    g.fillText(e.side>0?'EQH':'EQL',(xa+xb)/2,y+(e.side>0?-2:2));
+  }
+  g.restore();
+}
+function equalLevels(st,a){
+  const tol=a*0.25,out=[];
+  const scan=(arr,side)=>{const r=arr.slice(-14);for(let i=0;i<r.length;i++)for(let j=i+1;j<r.length;j++)if(Math.abs(r[i].p-r[j].p)<tol&&r[j].i-r[i].i>=4){out.push({t1:r[i].t,t2:r[j].t,p:(r[i].p+r[j].p)/2,side});break}};
+  scan(st.hi,1);scan(st.lo,-1);return out.slice(-6);
+}
+
 const vw=chart.addLineSeries({color:'#8e8e93',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false});
 
 
@@ -874,7 +923,11 @@ function render(x){
   pl(b.entry,TH.up,b.dir===1?'COMPRA':'VENDA',0,2);pl(b.stop,'#d93b3b','STOP',0,2);
   b.tps.forEach((t,i)=>pl(t.p,'#1f9d55','TP'+(i+1),0,1));
   if(typeof drawOrderLines==='function'&&typeof OPEN!=='undefined')drawOrderLines();
-  (document.body.classList.contains('simple')?[]:zs.slice(0,6)).forEach(z=>{pl(z.top,z.dir===1?'rgba(31,157,85,.45)':'rgba(217,59,59,.4)',z.kind,1);pl(z.bot,z.dir===1?'rgba(31,157,85,.45)':'rgba(217,59,59,.4)','',1)});
+  {const simple=document.body.classList.contains('simple'),near=z=>Math.abs((z.top+z.bot)/2-x.px)<=x.a*25;
+   const obs=x.zones.filter(z=>z.kind==='OB'&&near(z)),fv=simple?[]:x.zones.filter(z=>z.kind==='FVG'&&near(z));
+   const pick=(arr,d,n)=>arr.filter(z=>z.dir===d).sort((p,q)=>q.i-p.i).slice(0,n);
+   BOX.zones=[...pick(fv,1,4),...pick(fv,-1,4),...pick(obs,1,simple?3:5),...pick(obs,-1,simple?3:5)];
+   BOX.eq=simple?[]:equalLevels(x.st,x.a);BOX.dirty=true}
   pl(x.eqm,'#aeaeb2','EQ',3);
   e21.setData(C.map((k,i)=>({time:k.t,value:x.E21[i]})));e200.setData(C.map((k,i)=>({time:k.t,value:x.E200[i]})));vw.setData(C.map((k,i)=>({time:k.t,value:x.VW[i]})));
   cs.setMarkers(x.st.events.slice(-10).map(e=>({time:e.t,position:e.dir===1?'belowBar':'aboveBar',color:e.dir===1?TH.up:'#d93b3b',shape:e.dir===1?'arrowUp':'arrowDown',text:e.type})));
