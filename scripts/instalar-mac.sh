@@ -28,6 +28,25 @@ PL
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+# Atualização automática a cada 10 minutos (git pull + reinício)
+ULABEL="com.mesasmc.update"; UPLIST="$HOME/Library/LaunchAgents/$ULABEL.plist"
+cat > "$UPLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$ULABEL</string>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$DIR/scripts/atualizar-mac.sh</string></array>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$(dirname "$NODE"):/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string></dict>
+  <key>StartInterval</key><integer>600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$LOG</string>
+  <key>StandardErrorPath</key><string>$LOG</string>
+</dict></plist>
+PL
+launchctl bootout "gui/$(id -u)/$ULABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$UPLIST"
+echo "Atualização automática ligada: confere o GitHub a cada 10 minutos."
 OK=0; for i in $(seq 1 15); do sleep 1; if curl -s -o /dev/null -w "%{http_code}" http://localhost:8787 | grep -q 200; then OK=1; break; fi; done
 if [ "$OK" = 1 ]; then
   echo "Pronto! O Mesa SMC está rodando em http://localhost:8787 e vai ligar sozinho sempre que você entrar no Mac."

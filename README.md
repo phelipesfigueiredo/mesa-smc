@@ -58,5 +58,6 @@ Depois de salvar, faça um novo deploy (Deployments → ⋯ → Redeploy) para v
 npm run instalar     # liga agora e sempre que você entrar no Mac; reinicia sozinho se cair
 npm run reiniciar    # depois de git pull ou de mudar o .env
 npm run log          # ver o que o servidor está fazendo
+npm run atualizar    # força a atualização agora (ela também roda sozinha a cada 10 min)
 npm run desinstalar  # desliga e remove
 ```

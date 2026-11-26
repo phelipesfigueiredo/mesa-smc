@@ -9,7 +9,8 @@
     "instalar": "bash scripts/instalar-mac.sh",
     "desinstalar": "bash scripts/desinstalar-mac.sh",
     "reiniciar": "bash scripts/reiniciar-mac.sh",
-    "log": "tail -n 50 -f ~/Library/Logs/mesa-smc.log"
+    "log": "tail -n 50 -f ~/Library/Logs/mesa-smc.log",
+    "atualizar": "bash scripts/atualizar-mac.sh"
   },
   "engines": {
     "node": ">=18"
