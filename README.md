@@ -41,3 +41,13 @@ Os sinais são gerados por regras automáticas. A nota de confluência não é p
 O repositório publica na Vercel o painel (`index.html`) e as notícias (`api/news.js`).
 Na versão online o envio de ordens para a Bitget fica **desligado** de propósito: as chaves
 e o acompanhamento dos TPs parciais só rodam no servidor local (`npm start`).
+
+### Senha da versão online
+
+O `middleware.js` pede usuário e senha antes de abrir o site na Vercel.
+Configure em **Vercel → projeto mesa-smc → Settings → Environment Variables**:
+
+- `APP_PASSWORD`: a senha (obrigatória; sem ela o site fica bloqueado)
+- `APP_USER`: o usuário (opcional, padrão `mesa`)
+
+Depois de salvar, faça um novo deploy (Deployments → ⋯ → Redeploy) para valer.
