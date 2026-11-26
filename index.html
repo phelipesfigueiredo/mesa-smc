@@ -308,9 +308,25 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .zero{font:500 .74rem var(--body);padding:6px 9px;border-radius:9px;background:rgba(255,255,255,.05);color:#c7c7cc}
 .zero.on{background:rgba(48,209,88,.14);color:#30d158}
 @media(prefers-reduced-motion:reduce){.chip .sigdot{animation:none!important}}
+.alertbox{position:relative;flex-wrap:wrap}
+.almin{font:500 .76rem var(--body);padding:7px 10px;border-radius:99px;background:var(--panel);color:var(--fg);border:1px solid var(--line)}
+.albtn.ghost b{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--panel2);font:600 .66rem var(--mono)}
+.alhist{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:min(420px,92vw);max-height:60vh;overflow:auto;display:grid;gap:6px;padding:8px;border-radius:16px;background:#111113;color:#f5f5f3;box-shadow:0 24px 60px -16px rgba(0,0,0,.6)}
+.alitem,.toast{display:grid;gap:2px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.05);color:#f5f5f3;cursor:pointer;font:400 .76rem/1.4 var(--body)}
+.alitem b,.toast b{font:700 .86rem var(--display)}
+.alitem small,.toast small{color:#8e8e93;font-size:.66rem}
+.alitem.l,.toast.l{border-left:4px solid #30d158}.alitem.s,.toast.s{border-left:4px solid #ff453a}
+.toasts{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));right:16px;z-index:100;display:grid;gap:8px;width:min(380px,calc(100vw - 32px))}
+.toast{background:#111113;box-shadow:0 18px 40px -12px rgba(0,0,0,.55);animation:tin .35s ease-out}
+.toast.out{opacity:0;transform:translateX(30px);transition:all .35s}
+@keyframes tin{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+.toast{position:relative;padding-right:34px}
+.toast .tx{position:absolute;top:6px;right:8px;background:none;border:0;color:#8e8e93;font:400 1.2rem/1 var(--body);cursor:pointer;padding:2px 6px}
+.toast .tx:hover{color:#f5f5f3}
 </style>
 </head>
 <body>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 <div class="wrap">
 <header>
   <a class="brand" href="/" aria-label="Mesa SMC"><img src="/icons/logo.svg" alt="" width="38" height="38"><h1><b>MESA SMC</b><span>Phelipe Figueiredo</span></h1></a>
@@ -332,7 +348,13 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 <div class="toolbar"><div style="display:grid;gap:6px"><div class="chips" id="chips"></div><div class="chipleg"><span><i style="background:#30d158"></i>compra agora</span><span><i style="background:#ff453a"></i>venda agora</span><span><i style="background:#ff9f0a"></i>sinal com ordem limitada</span></div></div>
   <div class="alertbox">
     <button type="button" id="alBtn" class="albtn" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.4 15.2A1 1 0 0 0 5.3 17h13.4a1 1 0 0 0 .9-1.8L18 12.6V9a6 6 0 0 0-6-6Zm0 19a3 3 0 0 0 2.8-2H9.2A3 3 0 0 0 12 22Z" fill="currentColor"/></svg><span id="alTxt">Ativar alertas</span></button>
+    <select id="alMin" class="almin" title="Quais sinais geram alerta">
+      <option value="8">Só setup A (nota 8+)</option>
+      <option value="6">Setups A e B (nota 6+)</option>
+    </select>
+    <button type="button" id="alHistBtn" class="albtn ghost" aria-expanded="false">Últimos alertas <b id="alCount">0</b></button>
     <span class="alstat" id="alStat"></span>
+    <div class="alhist" id="alHist" hidden></div>
   </div>
   <div class="fxbar" title="Dólar cripto (USDT/BRL) na Binance, últimas 24h">
     <span class="fxl">USDT/BRL</span><span class="px" id="fxpx">—</span><span class="chg" id="fxchg">—</span>
@@ -1088,7 +1110,7 @@ async function alToggle(){
     let p=Notification.permission;if(p==='default')p=await Notification.requestPermission();
     if(p!=='granted'){alUI();$('alStat').textContent='Permita as notificações para este site nas configurações do navegador';return}
     AL.on=true;try{if(!AL.swReg&&'serviceWorker' in navigator&&location.protocol.startsWith('http'))AL.swReg=await navigator.serviceWorker.register('/sw.js')}catch{}
-    notify('Alertas ligados','Você será avisado quando um sinal ficar operável.',null,false);
+    notify('Alertas ligados',`Você será avisado só quando der para abrir agora (${AL.min>=8?'setup A, nota 8+':'setups A e B, nota 6+'}).`,null,false,0);
     alScanStart();
   }else{AL.on=false}
   try{localStorage.setItem('smc_alerts',AL.on?'1':'0')}catch{}
@@ -1096,11 +1118,26 @@ async function alToggle(){
 }
 let audioCtx=null;
 function beep(strong){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const t=audioCtx.currentTime;[0,.18].concat(strong?[.36]:[]).forEach((d,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=strong?880+i*110:660;g.gain.setValueAtTime(.0001,t+d);g.gain.exponentialRampToValueAtTime(.18,t+d+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d+.16);o.connect(g).connect(audioCtx.destination);o.start(t+d);o.stop(t+d+.17)})}catch{}}
-async function notify(title,body,sym,strong){
+AL.hist=[];try{AL.hist=JSON.parse(localStorage.getItem('smc_al_hist')||'[]')}catch{}
+AL.min=8;try{AL.min=+(localStorage.getItem('smc_al_min')||8)}catch{}
+function alHistRender(){
+  $('alCount').textContent=AL.hist.length;
+  $('alHist').innerHTML=AL.hist.length?AL.hist.map(x=>`<button type="button" class="alitem ${x.dir===1?'l':x.dir===-1?'s':''}" data-sym="${esc(x.sym||'')}"><b>${esc(x.title)}</b><span>${esc(x.body)}</span><small>${new Date(x.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></button>`).join(''):'<div class="mu" style="padding:10px">Nenhum alerta ainda.</div>';
+}
+function toast(title,body,sym,dir){
+  const t=document.createElement('div');t.className='toast '+(dir===1?'l':dir===-1?'s':'');t.setAttribute('role','status');
+  t.innerHTML=`<button type="button" class="tx" aria-label="Fechar aviso">×</button><b>${esc(title)}</b><span>${esc(body)}</span>${sym?'<small>Toque para abrir a moeda</small>':''}`;
+  t.onclick=e=>{if(!e.target.closest('.tx')&&sym)openSym(sym);t.remove()};$('toasts').prepend(t);
+  while($('toasts').children.length>3)$('toasts').lastChild.remove();
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),400)},60000);
+}
+async function notify(title,body,sym,strong,dir){
+  AL.hist.unshift({title,body,sym,dir,at:Date.now()});AL.hist=AL.hist.slice(0,30);
+  try{localStorage.setItem('smc_al_hist',JSON.stringify(AL.hist))}catch{}
+  alHistRender();toast(title,body,sym,dir);beep(strong);flashTitle(title);
   if(!canNotify())return;
   const opt={body,tag:sym?'smc-'+sym:'smc',renotify:true,icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',data:{sym},requireInteraction:!!strong};
   try{if(AL.swReg)await AL.swReg.showNotification(title,opt);else{const n=new Notification(title,opt);n.onclick=()=>{window.focus();if(sym)openSym(sym);n.close()}}}catch{try{new Notification(title,opt)}catch{}}
-  beep(strong);flashTitle(title);
 }
 let flashT=null;
 function flashTitle(t){if(!document.hidden)return;clearInterval(flashT);const orig=document.title;let k=0;flashT=setInterval(()=>{document.title=k++%2?orig:'🔔 '+t;if(!document.hidden||k>40){clearInterval(flashT);document.title=orig}},1000)}
@@ -1115,19 +1152,16 @@ function chipMark(sym,r){
 function alMaybe(sym,r){
   chipMark(sym,r);
   if(!AL.on)return;
-  const coin=sym.replace(/USDT$/,''),tf=$('tf').value,ts=Date.now();
-  const mark=key=>{if(AL.sent[key])return false;AL.sent[key]=ts;try{AL.sent=Object.fromEntries(Object.entries(AL.sent).filter(([,t])=>ts-t<3*864e5));localStorage.setItem('smc_alert_sent',JSON.stringify(AL.sent))}catch{}return true};
-  if(r.lockEnded&&mark(`${sym}|${tf}|${r.lockEnded.id}|end`))notify(`Plano encerrado · ${coin}`,`O plano de ${r.lockEnded.dir===1?'compra':'venda'} em ${fmt(r.lockEnded.entry)} acabou: ${r.lockEnded.why}.`,sym,false);
-  const s=sigState(r);if(!s.active||!s.b.locked)return;
-  const b=s.b,L=b.locked,act=b.dir===1?'COMPRAR':'VENDER';
-  const vals=`Entrada ${fmt(b.entry)} · Stop ${fmt(b.stop)} · Alvo ${fmt(b.tps[0]?.p)} · R:R ${fmt(b.rr,1)}`;
-  const grade=`Nota ${L.score}/10${L.score>=8?' (setup A)':' (setup B, meia mão)'}`;
-  if(mark(`${sym}|${tf}|${L.id}|new`)){
-    const title=L.replaces?`Plano atualizado · ${coin}`:s.now?`${act} AGORA · ${coin}`:`Sinal de ${b.dir===1?'compra':'venda'} · ${coin}`;
-    notify(title,`${grade} · ${vals}${s.now?'':'\nOrdem limitada: espere o preço vir até a entrada.'}`,sym,s.now&&!L.replaces);
-  }else if(s.now&&mark(`${sym}|${tf}|${L.id}|zone`)){
-    notify(`${act} AGORA · ${coin}`,`O preço chegou na zona do plano travado. ${grade} · ${vals}`,sym,true);
-  }
+  const s=sigState(r),b=s.b,L=b.locked;
+  // só avisa quando dá para abrir AGORA: plano travado, preço na zona de entrada e nota no nível escolhido
+  if(!s.active||!L||!s.now||L.score<AL.min)return;
+  const ts=Date.now(),key=`${sym}|${$('tf').value}|${L.id}|now`;
+  if(AL.sent[key])return;
+  AL.sent[key]=ts;try{AL.sent=Object.fromEntries(Object.entries(AL.sent).filter(([,t])=>ts-t<3*864e5));localStorage.setItem('smc_alert_sent',JSON.stringify(AL.sent))}catch{}
+  const coin=sym.replace(/USDT$/,''),act=b.dir===1?'COMPRAR':'VENDER';
+  const title=`${act} AGORA · ${coin} · nota ${L.score}/10`;
+  const body=`${L.score>=8?'Setup A, risco cheio':'Setup B, use metade do risco'} · Entrada ${fmt(b.entry)} · Stop ${fmt(b.stop)} · Alvo 1 ${fmt(b.tps[0]?.p)} · R:R ${fmt(b.rr,1)}`;
+  notify(title,body,sym,true,b.dir);
 }
 async function alScanOnce(){
   if(document.hidden&&!AL.on)return;const cfg=CFG[$('tf').value],cur=$('sym').value.trim().toUpperCase();
@@ -1170,6 +1204,11 @@ if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
   ping();setInterval(ping,60000);
 }
 $('alBtn').onclick=alToggle;alUI();
+$('alMin').value=String(AL.min);$('alMin').onchange=e=>{AL.min=+e.target.value;try{localStorage.setItem('smc_al_min',AL.min)}catch{}};
+alHistRender();
+$('alHistBtn').onclick=()=>{const o=$('alHist').hidden;$('alHist').hidden=!o;$('alHistBtn').setAttribute('aria-expanded',o)};
+$('alHist').onclick=e=>{const b=e.target.closest('.alitem');if(b&&b.dataset.sym){openSym(b.dataset.sym);$('alHist').hidden=true}};
+document.addEventListener('click',e=>{if(!e.target.closest('.alertbox'))$('alHist').hidden=true});
 if(!AL.on)alScanStart();
 if(AL.on){if(canNotify()){(async()=>{try{if('serviceWorker' in navigator&&location.protocol.startsWith('http'))AL.swReg=await navigator.serviceWorker.register('/sw.js')}catch{}alScanStart()})()}else{AL.on=false;alUI()}}
 $('tf').addEventListener('change',alUI);
