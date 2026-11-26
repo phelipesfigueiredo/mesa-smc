@@ -1112,6 +1112,14 @@ $('mSimple').onclick=()=>setMode('simple');$('mAdv').onclick=()=>setMode('adv');
 let m0='simple';try{m0=localStorage.getItem('smc_mode')||'simple'}catch{}
 document.body.classList.toggle('simple',m0==='simple');$('mSimple').setAttribute('aria-pressed',m0==='simple');$('mAdv').setAttribute('aria-pressed',m0!=='simple');
 $('btrun').onclick=runBacktest;
+/* recarrega sozinho quando o app local for atualizado (sem atrapalhar se você estiver digitando ou confirmando algo) */
+if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
+  let ver=null;
+  setInterval(async()=>{try{const j=await (await fetch('/api/version',{cache:'no-store'})).json();
+    if(ver&&j.v!==ver){const busy=document.activeElement&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)||(typeof OPEN!=='undefined'&&(OPEN.confirm||OPEN.busy));
+      if(!busy){location.reload();return}}
+    ver=ver||j.v}catch{}},5000);
+}
 /* botão para o app local (só aparece fora do localhost) */
 function localUrl(){return 'http://localhost:8787/#'+$('sym').value.trim().toUpperCase()}
 if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){

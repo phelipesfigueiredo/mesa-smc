@@ -12,6 +12,7 @@ try {
 } catch {}
 
 const PORT = +process.env.PORT || 8787;
+const BOOT = Date.now();
 const HTML = path.join(__dirname, 'index.html');
 const BASE = 'https://api.bitget.com';
 
@@ -308,6 +309,11 @@ if (require.main === module) http.createServer(async (req, res) => {
     if ((origin && origin !== `http://${host}`) || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(res, 403, { error: 'Origem não permitida' });
     try {
       if (url.pathname === '/api/news') { const n = await getNews(); return send(res, 200, { items: n.data, errors: n.errors, at: n.at }); }
+      if (url.pathname === '/api/version') {
+        // muda sempre que o app é atualizado (o servidor reinicia ou o index.html muda)
+        let v = String(BOOT); try { v += '-' + fs.statSync(HTML).mtimeMs; } catch {}
+        return send(res, 200, { v });
+      }
       if (url.pathname === '/api/bitget/open') return send(res, 200, await openState(url.searchParams.get('mode') === 'live' ? 'live' : 'demo'));
       if ((url.pathname === '/api/bitget/close' || url.pathname === '/api/bitget/cancel') && req.method === 'POST') {
         if (req.headers['content-type'] !== 'application/json') return send(res, 415, { error: 'JSON esperado' });
