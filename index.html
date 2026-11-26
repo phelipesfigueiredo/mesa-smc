@@ -624,7 +624,7 @@ function scoreNews(n){const t=n.title+' '+(n.body||'').slice(0,300);let s=0,why=
 function renderNews(){
   const el=$('news');if($('newsmeta'))$('newsmeta').textContent=NEWS_AT&&news?`· ${news.length} notícias · ${NEWS_SRC} · ${NEWS_AT.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'';
   const mv=$('movers');
-  if(news===null){mv.innerHTML=location.protocol.startsWith('http')?'<div class="mu">Nenhuma fonte de notícias respondeu. Veja os avisos no Terminal do servidor.</div>':'<div class="mu">Não foi possível carregar as notícias. Abra o app por <b>http://localhost:8787</b> (rodando <b>node server.js</b>) para buscar notícias de CoinDesk, Cointelegraph, Decrypt, The Block, Livecoins, Portal do Bitcoin e InfoMoney.</div>';el.innerHTML=''}
+  if(news===null){mv.innerHTML=location.protocol.startsWith('http')?'<div class="mu">Nenhuma fonte de notícias respondeu. Veja os avisos no Terminal do servidor.</div>':'<div class="mu">Não foi possível carregar as notícias. Abra o app por <b>http://localhost:8787</b> (rodando <b>node server.js</b>) para buscar notícias de CoinDesk, Cointelegraph, Decrypt, The Block, Livecoins e Portal do Bitcoin.</div>';el.innerHTML=''}
   else{const top=news.map(n=>({n,...scoreNews(n)})).filter(x=>x.s>=3&&(Date.now()/1000-x.n.published_on)<36*3600).sort((a,b)=>b.s-a.s).slice(0,5);
    mv.innerHTML=top.map(({n,s,why,dir})=>{const ago=Math.round((Date.now()/1000-n.published_on)/60);const url=/^https:\/\//.test(n.url)?n.url:'#';
     return`<div class="mover"><span class="lvl ${s>=6?'hi':'md'}">${s>=6?'ALTO':'MÉDIO'}</span><div><a href="${esc(url)}" target="_blank" rel="noopener">${esc(n.title)}</a>
@@ -716,7 +716,9 @@ const setAcct=m=>{$('bgmode').value=m;$('acDemo').setAttribute('aria-pressed',m=
 $('acDemo').onclick=()=>setAcct('demo');$('acLive').onclick=()=>setAcct('live');
 markQuick();
 $('bgauto').onchange=e=>{if(e.target.checked){if($('bgmode').value==='live'){$('bghint').textContent='Modo automático ligado na conta REAL. Ordens serão enviadas sozinhas quando houver sinal.'}bglog('Automático ligado')}else bglog('Automático desligado')};
-if(onServer)bgTest();else $('bghint').innerHTML='Para operar, rode <b>node server.js</b> e abra <b>http://localhost:8787</b>. Aberto como arquivo, o app só analisa.';
+const isLocal=/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+if(onServer&&!isLocal){$('bgconn').textContent='só no app local';$('bghint').innerHTML='Na versão online o app só analisa. Para operar na Bitget, rode <b>npm start</b> no seu computador e abra <b>http://localhost:8787</b>.';$('bgtest').disabled=true}
+else if(onServer)bgTest();else $('bghint').innerHTML='Para operar, rode <b>node server.js</b> e abra <b>http://localhost:8787</b>. Aberto como arquivo, o app só analisa.';
 
 /* ---------- escala por moeda ---------- */
 function decimalsFor(p){if(!(p>0))return 2;if(p>=1000)return 1;if(p>=100)return 2;if(p>=1)return 3;if(p>=0.1)return 4;if(p>=0.01)return 5;if(p>=0.001)return 6;if(p>=0.0001)return 7;return 8}

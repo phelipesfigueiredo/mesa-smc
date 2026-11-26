@@ -7,7 +7,7 @@ Painel de trade de criptomoedas baseado em Smart Money Concepts (SMC), por Pheli
 - Nota de confluência de 0 a 10 e cálculo de tamanho da posição pelo seu capital e risco
 - Volume, CVD, funding, open interest e long/short (Binance Futures)
 - Card do USDT/BRL em tempo real
-- Notícias que movem o mercado (CoinDesk, Cointelegraph, Decrypt, The Block, Livecoins, Portal do Bitcoin, InfoMoney)
+- Notícias que movem o mercado (CoinDesk, Cointelegraph, Decrypt, The Block, Livecoins, Portal do Bitcoin)
 - Envio de ordens limitadas com stop e take profit para a Bitget (demo ou real), manual ou automático
 - Modo claro e noturno, modo Simples e Avançado
 
