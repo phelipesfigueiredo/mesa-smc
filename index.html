@@ -453,6 +453,52 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .jgrp{display:grid;gap:2px;font-size:.82rem}
 .jr .mini{padding:5px 10px;border-radius:8px;font:600 .72rem var(--body);background:var(--panel2);border:1px solid var(--line);color:var(--fg);cursor:pointer}
 .bg label.levauto{display:flex;grid-template-columns:none;text-transform:none;letter-spacing:0;font:500 .76rem var(--body);color:#c7c7cc}
+.jkpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media(max-width:1000px){.jkpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{display:grid;gap:4px;padding:14px 14px 12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);min-width:0}
+.kpi small,.jhead small{font:600 .62rem var(--body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.kpi b{font:700 1.45rem var(--display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi span{font:400 .72rem var(--body);color:var(--muted)}
+.kpi b.mid{color:var(--warn)}
+.wl{height:5px;border-radius:9px;background:rgba(255,69,58,.35);overflow:hidden}.wl i{display:block;height:100%;background:var(--long)}
+.jmid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:10px}
+@media(max-width:900px){.jmid{grid-template-columns:1fr}}
+.jcard{display:grid;gap:10px;align-content:start;padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);min-width:0}
+.jhead{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.76rem}
+#jrCurve{width:100%;height:160px;display:block}
+.svgzero{stroke:var(--muted);stroke-opacity:.4;stroke-dasharray:4 4}
+.svgmu{fill:var(--muted);font:500 13px var(--body)}
+.gbars{display:grid;gap:12px}
+.gb{display:grid;gap:6px}
+.gbh{display:flex;justify-content:space-between;gap:8px;font-size:.78rem}.gbh b{font-weight:600}.gbh span{font:500 .74rem var(--mono);color:var(--muted)}
+.gtrack{height:6px;border-radius:9px;background:var(--line);overflow:hidden}.gtrack i{display:block;height:100%;border-radius:9px;background:var(--long);transition:width .4s}
+.gb.mid .gtrack i{background:var(--warn)}.gb.bad .gtrack i{background:var(--short)}.gb.bad .gbh b{color:var(--short)}
+.tagp{font:700 .6rem var(--body);letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:99px}
+.tagp.ok{background:rgba(48,209,88,.15);color:var(--long)}.tagp.bad{background:rgba(255,69,58,.15);color:var(--short)}
+.hb{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:.8rem}
+.hbl em{font-style:normal;color:var(--muted);font-size:.72rem;margin-left:4px}
+.hbt{height:8px;border-radius:9px;background:var(--line);overflow:hidden}.hbt i{display:block;height:100%;border-radius:9px}.hbt i.p{background:var(--long)}.hbt i.n{background:var(--short)}
+.hbv{font:600 .78rem var(--mono);font-variant-numeric:tabular-nums;min-width:70px;text-align:right}
+
+/* ---------- noturno: um pouco mais claro para leitura ---------- */
+:root[data-theme="dark"]{--muted:#a1a1a6;--line:rgba(255,255,255,.12);--panel2:#141417}
+:root[data-theme="dark"] .panel,:root[data-theme="dark"] .panel.gray,:root[data-theme="dark"] .panel.ink,:root[data-theme="dark"] .verdict,:root[data-theme="dark"] .mycard,:root[data-theme="dark"] .reader,:root[data-theme="dark"] .toast,:root[data-theme="dark"] .alhist{background:#0b0b0d!important}
+:root[data-theme="dark"] header{background:#0b0b0d!important}
+:root[data-theme="dark"] .panel,:root[data-theme="dark"] .panel.gray,:root[data-theme="dark"] .panel.ink,:root[data-theme="dark"] .verdict,:root[data-theme="dark"] header{border-color:rgba(255,255,255,.14)!important}
+:root[data-theme="dark"] .keynums div,:root[data-theme="dark"] .mygrid div,:root[data-theme="dark"] .obox,:root[data-theme="dark"] .pos,:root[data-theme="dark"] .mover,:root[data-theme="dark"] .summary,:root[data-theme="dark"] .lockline,:root[data-theme="dark"] .btline,:root[data-theme="dark"] .zero,:root[data-theme="dark"] .alitem,:root[data-theme="dark"] .confirm,:root[data-theme="dark"] .seg2,:root[data-theme="dark"] .quick button,:root[data-theme="dark"] .bg button,:root[data-theme="dark"] .bg .mini,:root[data-theme="dark"] .chg,:root[data-theme="dark"] .score,:root[data-theme="dark"] .pill2,:root[data-theme="dark"] .kpi,:root[data-theme="dark"] .jcard,:root[data-theme="dark"] .fxbar,:root[data-theme="dark"] .chip:not([aria-pressed="true"]),:root[data-theme="dark"] .almin,:root[data-theme="dark"] .albtn:not([aria-pressed="true"]),:root[data-theme="dark"] header input,:root[data-theme="dark"] header select,:root[data-theme="dark"] header .seg,:root[data-theme="dark"] header .iconbtn,:root[data-theme="dark"] .money,:root[data-theme="dark"] .bg select,:root[data-theme="dark"] .bg input{background:#141417!important;border-color:rgba(255,255,255,.12)!important}
+:root[data-theme="dark"] .seg2 button[aria-pressed="true"],:root[data-theme="dark"] .bg button.primary{background:#f5f5f7!important;color:#000!important}
+:root[data-theme="dark"] h2,:root[data-theme="dark"] .mu,:root[data-theme="dark"] .note,:root[data-theme="dark"] .kpi small,:root[data-theme="dark"] .kpi span,:root[data-theme="dark"] .jhead small,:root[data-theme="dark"] small{color:#a8a8ad}
+:root[data-theme="dark"] .tvbar,:root[data-theme="dark"] .row,:root[data-theme="dark"] .bt td{border-color:rgba(255,255,255,.1)!important}
+@media (prefers-color-scheme: dark){
+:root:not([data-theme="light"]){--muted:#a1a1a6;--line:rgba(255,255,255,.12);--panel2:#141417}
+:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray,:root:not([data-theme="light"]) .panel.ink,:root:not([data-theme="light"]) .verdict,:root:not([data-theme="light"]) .mycard,:root:not([data-theme="light"]) .reader,:root:not([data-theme="light"]) .toast,:root:not([data-theme="light"]) .alhist{background:#0b0b0d!important}
+:root:not([data-theme="light"]) header{background:#0b0b0d!important}
+:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray,:root:not([data-theme="light"]) .panel.ink,:root:not([data-theme="light"]) .verdict,:root:not([data-theme="light"]) header{border-color:rgba(255,255,255,.14)!important}
+:root:not([data-theme="light"]) .keynums div,:root:not([data-theme="light"]) .mygrid div,:root:not([data-theme="light"]) .obox,:root:not([data-theme="light"]) .pos,:root:not([data-theme="light"]) .mover,:root:not([data-theme="light"]) .summary,:root:not([data-theme="light"]) .lockline,:root:not([data-theme="light"]) .btline,:root:not([data-theme="light"]) .zero,:root:not([data-theme="light"]) .alitem,:root:not([data-theme="light"]) .confirm,:root:not([data-theme="light"]) .seg2,:root:not([data-theme="light"]) .quick button,:root:not([data-theme="light"]) .bg button,:root:not([data-theme="light"]) .bg .mini,:root:not([data-theme="light"]) .chg,:root:not([data-theme="light"]) .score,:root:not([data-theme="light"]) .pill2,:root:not([data-theme="light"]) .kpi,:root:not([data-theme="light"]) .jcard,:root:not([data-theme="light"]) .fxbar,:root:not([data-theme="light"]) .chip:not([aria-pressed="true"]),:root:not([data-theme="light"]) .almin,:root:not([data-theme="light"]) .albtn:not([aria-pressed="true"]),:root:not([data-theme="light"]) header input,:root:not([data-theme="light"]) header select,:root:not([data-theme="light"]) header .seg,:root:not([data-theme="light"]) header .iconbtn,:root:not([data-theme="light"]) .money,:root:not([data-theme="light"]) .bg select,:root:not([data-theme="light"]) .bg input{background:#141417!important;border-color:rgba(255,255,255,.12)!important}
+:root:not([data-theme="light"]) .seg2 button[aria-pressed="true"],:root:not([data-theme="light"]) .bg button.primary{background:#f5f5f7!important;color:#000!important}
+:root:not([data-theme="light"]) h2,:root:not([data-theme="light"]) .mu,:root:not([data-theme="light"]) .note,:root:not([data-theme="light"]) .kpi small,:root:not([data-theme="light"]) .kpi span,:root:not([data-theme="light"]) .jhead small,:root:not([data-theme="light"]) small{color:#a8a8ad}
+:root:not([data-theme="light"]) .tvbar,:root:not([data-theme="light"]) .row,:root:not([data-theme="light"]) .bt td{border-color:rgba(255,255,255,.1)!important}
+}
 </style>
 </head>
 <body>
@@ -510,10 +556,13 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <div id="btout" style="display:grid;gap:8px;margin-top:10px"></div></div>
     <div class="panel jr" id="jrPanel">
       <div class="stepH"><h2 style="margin:0">Diário e proteção</h2><span><span class="pill2" id="jrAcct">DEMO</span> <button type="button" class="mini" id="jrSync">Sincronizar agora</button></span></div>
-      <div class="guards" id="jrGuards"><div class="mu">Conecte a Bitget no app local para ver as travas e o diário.</div></div>
-      <div class="jstats" id="jrStats"></div>
-      <div class="jsplit"><div id="jrSetup"></div><div id="jrSess"></div></div>
-      <div class="tablewrap"><table class="bt" id="jrTable"></table></div>
+      <div class="jkpis" id="jrKpis"></div>
+      <div class="jmid">
+        <div class="jcard"><div class="jhead"><small>Resultado acumulado</small><span class="mu" id="jrCurveInfo"></span></div><svg id="jrCurve" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Curva do resultado acumulado"></svg></div>
+        <div class="jcard"><div class="jhead"><small>Travas de proteção</small><span id="jrGuardState"></span></div><div id="jrGuards" class="gbars"><div class="mu">Conecte a Bitget no app local para ver as travas e o diário.</div></div></div>
+      </div>
+      <div class="jsplit"><div class="jcard" id="jrSetup"></div><div class="jcard" id="jrSess"></div></div>
+      <div class="jcard"><div class="jhead"><small>Últimas operações</small></div><div class="tablewrap"><table class="bt" id="jrTable"></table></div></div>
       <div class="note" id="jrSheets"></div>
     </div></div>
   <div style="display:grid;gap:14px;align-content:start">
@@ -1210,23 +1259,47 @@ async function jrLoad(force){
 function jrRender(){
   const d=JR.data;if(!d)return;const g=d.guard,s=d.stats,R=g.rules;
   $('jrAcct').textContent=$('bgmode').value==='demo'?'DEMO':'REAL';
-  const pill=(ok,label,val)=>`<div class="gpill ${ok?'ok':'bad'}"><i></i><b>${label}</b><span>${val}</span></div>`;
-  const pct=v=>v==null?'—':(v>=0?'+':'')+fmt(v,2)+'%';
-  const seqBlock=g.blocks.find(b=>b.code==='sequencia');
-  $('jrGuards').innerHTML=pill(!g.blocks.find(b=>b.code==='dia'),'Hoje',`${pct(g.dayPct)} · limite −${R.dayLoss*100}%`)
-    +pill(!g.blocks.find(b=>b.code==='semana'),'Semana',`${pct(g.weekPct)} · limite −${R.weekLoss*100}%`)
-    +pill((g.openRiskPct||0)<R.openRisk*100,'Risco aberto',`${g.openRiskPct==null?'—':fmt(g.openRiskPct,2)+'%'} · limite ${R.openRisk*100}%`)
-    +pill(!seqBlock,'Sequência',seqBlock?'pausa ativa':`pausa após ${R.streak} stops`)
-    +(g.blocks.length?`<div class="warn bad gfull">🔒 ${g.blocks.map(b=>esc(b.msg)).join('<br>')}</div>`:'<div class="note ok gfull">Travas OK: pode operar dentro do plano.</div>');
+  const cap=+$('cap').value||0,usd=v=>`${v>=0?'+':'−'}US$ ${fmt(Math.abs(v),2)}`;
+  // KPIs
+  const wr=s.winrate==null?0:s.winrate*100;
+  const kpi=(l,v,sub,c='')=>`<div class="kpi"><small>${l}</small><b class="${c}">${v}</b><span>${sub}</span></div>`;
+  $('jrKpis').innerHTML=
+    kpi('Resultado',usd(s.total),cap?`${s.total>=0?'+':''}${fmt(s.total/cap*100,2)}% da banca`:`${s.n} operações`,s.total>=0?'ok':'bad')
+   +kpi('Expectativa',s.expR==null?'—':`${s.expR>=0?'+':''}${fmt(s.expR,2)}R`,s.nR?`média de ${s.nR} operações`:'sem R calculado ainda',s.expR==null?'':s.expR>=0?'ok':'bad')
+   +`<div class="kpi"><small>Acerto</small><b>${s.winrate==null?'—':fmt(wr,0)+'%'}</b><div class="wl"><i style="width:${wr}%"></i></div><span>${s.wins||0} ganhos · ${s.losses||0} perdas</span></div>`
+   +kpi('Profit factor',s.pf==null?'—':fmt(s.pf,2),s.pf==null?'—':s.pf>=1.3?'saudável (acima de 1,3)':s.pf>=1?'no limite':'abaixo de 1',s.pf==null?'':s.pf>=1.3?'ok':s.pf>=1?'mid':'bad')
+   +kpi('Queda máxima',`US$ ${fmt(Math.abs(s.maxDD),2)}`,cap?`${fmt(Math.abs(s.maxDD)/cap*100,2)}% da banca`:'maior queda do pico',s.maxDD<0?'bad':'');
+  // curva
+  const c=s.curva||[],W=600,H=160,P=10;
+  if(c.length<2){$('jrCurve').innerHTML=`<text x="300" y="85" text-anchor="middle" class="svgmu">A curva aparece a partir de 2 operações fechadas</text>`;$('jrCurveInfo').textContent=''}
+  else{
+    const vs=[0,...c.map(x=>x.v)],mn=Math.min(...vs),mx=Math.max(...vs),rg=mx-mn||1;
+    const X=i=>P+i/(vs.length-1)*(W-2*P),Y=v=>H-P-(v-mn)/rg*(H-2*P);
+    const pts=vs.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' '),last=vs.at(-1),col=last>=0?'var(--long)':'var(--short)';
+    $('jrCurve').innerHTML=`<defs><linearGradient id="jg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".25"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      <line x1="${P}" x2="${W-P}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" class="svgzero"/>
+      <polygon points="${X(0)},${Y(0)} ${pts} ${X(vs.length-1)},${Y(0)}" fill="url(#jg)"/>
+      <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      <circle cx="${X(vs.length-1)}" cy="${Y(last)}" r="4" fill="${col}"/>`;
+    $('jrCurveInfo').textContent=`${usd(last)} em ${c.length} operações`;
+  }
+  // travas como barras de consumo do limite
+  const bar=(l,used,lim,txt,blocked)=>{const p=Math.max(0,Math.min(100,lim?used/lim*100:0));return`<div class="gb ${blocked?'bad':p>=70?'mid':'ok'}"><div class="gbh"><b>${l}</b><span>${txt}</span></div><div class="gtrack"><i style="width:${p}%"></i></div></div>`};
+  const dayUsed=Math.max(0,-(g.dayPct||0)),weekUsed=Math.max(0,-(g.weekPct||0)),seq=g.blocks.find(b=>b.code==='sequencia');
+  $('jrGuards').innerHTML=
+    bar('Perda do dia',dayUsed,R.dayLoss*100,`${g.dayPct==null?'—':(g.dayPct>=0?'+':'')+fmt(g.dayPct,2)+'%'} de −${R.dayLoss*100}%`,g.blocks.some(b=>b.code==='dia'))
+   +bar('Perda da semana',weekUsed,R.weekLoss*100,`${g.weekPct==null?'—':(g.weekPct>=0?'+':'')+fmt(g.weekPct,2)+'%'} de −${R.weekLoss*100}%`,g.blocks.some(b=>b.code==='semana'))
+   +bar('Risco aberto',g.openRiskPct||0,R.openRisk*100,`${g.openRiskPct==null?'—':fmt(g.openRiskPct,2)+'%'} de ${R.openRisk*100}%`,false)
+   +`<div class="gb ${seq?'bad':'ok'}"><div class="gbh"><b>Stops seguidos</b><span>${seq?'pausa ativa':`pausa após ${R.streak}`}</span></div></div>`
+   +(g.blocks.length?`<div class="warn bad">🔒 ${g.blocks.map(b=>esc(b.msg)).join('<br>')}</div>`:'');
+  $('jrGuardState').innerHTML=g.blocks.length?'<span class="tagp bad">bloqueado</span>':'<span class="tagp ok">liberado</span>';
   JR.blocked=g.blocks.some(b=>b.code!=='risco');
-  const st=(l,v,c='')=>`<div><small>${l}</small><b class="${c}">${v}</b></div>`;
-  $('jrStats').innerHTML=st('Operações',s.n)+st('Acerto',s.winrate==null?'—':fmt(s.winrate*100,0)+'%')+st('Resultado',`${s.total>=0?'+':'−'}US$ ${fmt(Math.abs(s.total),2)}`,s.total>=0?'ok':'bad')
-    +st('Expectativa',s.expR==null?'—':(s.expR>=0?'+':'')+fmt(s.expR,2)+'R',s.expR>=0?'ok':'bad')+st('Profit factor',s.pf==null?'—':fmt(s.pf,2))+st('Queda máx.',`US$ ${fmt(Math.abs(s.maxDD),2)}`,'bad');
-  const grp=(t,a)=>`<div class="jgrp"><small>${t}</small>${a.length?a.map(x=>`<div class="row"><span>${esc(String(x.k))} <span class="mu">(${x.n})</span></span><span>${fmt(x.wr*100,0)}% · <span class="${x.total>=0?'ok':'bad'}">${x.total>=0?'+':''}${fmt(x.total,2)}</span></span></div>`).join(''):'<div class="mu">—</div>'}</div>`;
+  // setup e sessão em barras comparativas
+  const grp=(t,a)=>{const mx=Math.max(1,...a.map(x=>Math.abs(x.total)));return`<div class="jhead"><small>${t}</small></div>`+(a.length?a.map(x=>`<div class="hb"><span class="hbl">${esc(String(x.k))} <em>${x.n} op · ${fmt(x.wr*100,0)}%</em></span><div class="hbt"><i class="${x.total>=0?'p':'n'}" style="width:${Math.abs(x.total)/mx*100}%"></i></div><span class="hbv ${x.total>=0?'ok':'bad'}">${x.total>=0?'+':''}${fmt(x.total,2)}</span></div>`).join(''):'<div class="mu" style="font-size:.8rem">Sem operações ainda.</div>')};
   $('jrSetup').innerHTML=grp('Por setup',s.porSetup);$('jrSess').innerHTML=grp('Por sessão',s.porSessao);
   $('jrTable').innerHTML=s.ultimas.length?`<thead><tr><th>Fechou</th><th>Moeda</th><th>Lado</th><th>Setup</th><th>Resultado</th><th>R</th></tr></thead><tbody>${s.ultimas.map(j=>`<tr><td>${esc(j.fechamento.slice(5))}</td><td>${esc(j.moeda.replace(/USDT$/,''))}</td><td>${esc(j.lado)}</td><td>${esc(j.setup)}${j.nota!==''?' · '+j.nota:''}</td><td class="${j.resultado_usd>=0?'ok':'bad'}">${j.resultado_usd>=0?'+':''}${fmt(j.resultado_usd,2)}</td><td>${j.resultado_R===''?'—':fmt(j.resultado_R,2)}</td></tr>`).join('')}</tbody>`:'<tbody><tr><td class="mu">Nenhuma operação fechada nos últimos 30 dias.</td></tr></tbody>';
-  $('jrSheets').innerHTML=d.sheets.configured?(d.sheets.error?`<span class="bad">Planilha: ${esc(d.sheets.error)}</span>`:'Planilha do Google conectada: as operações fechadas são enviadas a cada 2 minutos.'):'Planilha do Google ainda não configurada (SHEETS_WEBHOOK_URL no .env).';
-  if(s.n<30)$('jrSheets').innerHTML+=`<br>Amostra de ${s.n} operações: ainda pequena para conclusões (o ideal é 30+ por setup).`;
+  $('jrSheets').innerHTML=(d.sheets.configured?(d.sheets.error?`<span class="bad">Planilha: ${esc(d.sheets.error)}</span>`:'<span class="ok">●</span> Planilha do Google conectada: as operações fechadas são enviadas a cada 2 minutos.'):'Planilha do Google ainda não configurada (SHEETS_WEBHOOK_URL no .env).')
+    +(s.n<30?` · Amostra de ${s.n} operações: ainda pequena para conclusões (o ideal é 30+ por setup).`:'');
   bgPreview();
 }
 $('jrSync').onclick=async e=>{e.target.disabled=true;e.target.textContent='Sincronizando…';await jrLoad(true);e.target.disabled=false;e.target.textContent='Sincronizar agora'};
