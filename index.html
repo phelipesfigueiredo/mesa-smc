@@ -190,6 +190,37 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .roi .tag2{display:inline-block;min-width:34px;font:600 .66rem var(--body);padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);text-align:center}
 .split{display:flex;gap:6px;align-items:center;font:500 .72rem var(--body);color:#8e8e93;flex-wrap:wrap}
 .split input{width:54px;padding:4px 6px;border-radius:7px;font:500 .78rem var(--mono)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.fxbar{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--sh1);flex-wrap:wrap}
+.fxbar .fxl{font:600 .66rem var(--body);letter-spacing:.1em;color:var(--muted)}
+.fxbar .px{font:700 1.05rem var(--display);font-variant-numeric:tabular-nums}
+.fxbar svg{width:90px;height:26px;display:block}
+.fxbar .fxm{font:400 .72rem var(--mono);color:var(--muted)}
+.fxbar .chg{padding:2px 7px}
+.main>div:last-child{position:sticky;top:96px;max-height:calc(100vh - 110px);overflow:auto;scrollbar-width:thin;padding-bottom:4px}
+@media(max-width:1050px){.main>div:last-child{position:static;max-height:none;overflow:visible}}
+.stepn{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.12);font:700 .7rem var(--body);margin-right:8px;color:#f5f5f3;vertical-align:1px}
+.vtop{display:flex;align-items:center}
+.vlabel{font:600 .66rem var(--body);letter-spacing:.12em;text-transform:uppercase;color:#8e8e93}
+.verdict::before{position:absolute;top:22px;right:22px;margin:0}
+.verdict .big{font-size:1.75rem}
+.verdict .summary{font-size:.92rem;padding:12px}
+.keynums{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.keynums div{background:rgba(255,255,255,.06);border-radius:12px;padding:9px 10px;display:grid;gap:1px;min-width:0}
+.keynums small{font:500 .6rem var(--body);letter-spacing:.1em;text-transform:uppercase;color:#8e8e93}
+.keynums b{font:600 .92rem var(--mono);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.planmore summary{cursor:pointer;font:600 .78rem var(--body);color:#8e8e93;padding:2px 0}
+.planmore[open] summary{margin-bottom:6px}
+.main>div:last-child{overflow-x:hidden;min-width:0}
+.bg{grid-template-columns:minmax(0,1fr)}
+.bg>*{min-width:0}
+.roi th,.roi td{white-space:nowrap;padding-left:6px}
+.roi{table-layout:auto}
+.bg .quick{grid-template-columns:repeat(4,minmax(0,1fr))}
+.bg .btns button{flex:1 1 auto}
+.step{grid-template-columns:minmax(0,1fr)}
+.money{min-width:0}
+.bg .money input{width:100%}
 </style>
 </head>
 <body>
@@ -210,20 +241,22 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
   <button class="iconbtn" id="theme" type="button" aria-label="Alternar modo noturno" title="Modo noturno">☾</button>
 </header>
 
-<div class="toolbar"><div class="chips" id="chips"></div></div>
+<div class="toolbar"><div class="chips" id="chips"></div>
+  <div class="fxbar" title="Dólar cripto (USDT/BRL) na Binance, últimas 24h">
+    <span class="fxl">USDT/BRL</span><span class="px" id="fxpx">—</span><span class="chg" id="fxchg">—</span>
+    <svg id="fxspark" viewBox="0 0 300 46" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <span class="fxm"><span id="fxlo">Mín —</span> · <span id="fxhi">Máx —</span></span>
+    <span class="fxm" id="fxvol" hidden></span><span class="fxm" id="fxbtc">BTC em R$ —</span>
+  </div></div>
 <div class="main">
   <div style="display:grid;gap:18px;min-width:0"><div class="panel" style="padding:10px"><div class="tvbar"><span class="symb" id="tvsym">BTCUSDT</span><span class="tvtf" id="tvtf"><button type="button" data-s="scalp">5m</button><button type="button" data-s="day">15m</button><button type="button" data-s="swing">1h</button></span><span class="legend" id="legend"></span></div><div id="chart"></div></div>
   <div class="panel news ink"><h2>Notícias que movem o mercado</h2><div class="movers" id="movers"><div class="mu">carregando…</div></div><div class="subh">Últimas <span id="newsmeta" style="text-transform:none;letter-spacing:0;font-weight:400"></span></div><ul id="news"></ul></div>
     <div class="panel gray"><h2><span data-tip="Checklist do método SMC. Cada item cumprido soma pontos. 8 ou mais: setup forte. 6 ou 7: operar com metade do risco. Abaixo de 6: não operar.">Por que esse sinal? Checklist</span></h2><div class="bar"><i id="scorebar" style="width:0"></i></div><div class="list" id="checks" style="margin-top:8px"></div></div></div>
   <div style="display:grid;gap:14px;align-content:start">
-    <div class="panel fx gray"><h2 style="margin:0 0 6px">Dólar cripto · USDT/BRL</h2>
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px"><span class="px" id="fxpx">—</span><span class="chg" id="fxchg">—</span></div>
-      <div class="meta"><span id="fxlo">Mín —</span><span id="fxhi">Máx —</span><span id="fxvol">Vol —</span></div>
-      <svg id="fxspark" viewBox="0 0 300 46" preserveAspectRatio="none" aria-hidden="true"></svg>
-      <div class="meta"><span>Binance · 24h</span><span id="fxbtc">BTC em R$ —</span></div></div>
+
     <div class="verdict v-wait" id="verdict"><div class="mu">Analisando…</div></div>
     <div class="panel bg ink" id="bgcard">
-      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Operar na Bitget</h2><span class="pill2" id="bgconn">offline</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0"><span class="stepn">2</span>Operar na Bitget</h2><span class="pill2" id="bgconn">offline</span></div>
       <div class="seg2" role="group" aria-label="Conta">
         <button type="button" id="acDemo" aria-pressed="true">Demo</button><button type="button" id="acLive" aria-pressed="false">Real</button>
       </div>
@@ -497,7 +530,13 @@ function render(x){
    <div class="mk now" style="left:${pos_(b.stop)};color:#ff6b61"><i style="width:2px;height:14px;border-radius:2px;background:#ff6b61;box-shadow:none"></i>STOP</div><div class="mk" style="left:${pos_(b.entry)};color:#f5f5f3">ENTRADA<i></i></div>
    ${b.tps.map((t,i)=>`<div class="mk" style="left:${pos_(t.p)};color:#4cd964">${i+1}<i></i></div>`).join('')}
    <div class="mk now" style="left:${pos_(px)}"><i></i>AGORA</div></div>`;
-  v.innerHTML=`<div class="big">${head}</div><div class="summary">${summary}</div>${ladder}
+  v.innerHTML=`<div class="vtop"><span class="stepn">1</span><span class="vlabel">Sinal agora · ${esc($('sym').value.toUpperCase())}</span></div><div class="big">${head}</div><div class="summary">${summary}</div>${ladder}
+  <div class="keynums">
+   <div><small>Entrada</small><b>${fmt(b.entry)}</b></div>
+   <div><small>Stop</small><b class="bad">${fmt(b.stop)}</b></div>
+   <div><small>Alvo 1</small><b class="ok">${fmt(b.tps[0]?.p)}</b></div>
+  </div>
+  <details class="planmore"><summary>Plano completo</summary>
   <dl class="plan">
    <dt>Preço agora</dt><dd>${fmt(px)}</dd>
    <dt><span data-tip="Preço em que a operação começa. Fica no meio de uma região onde o mercado costuma reagir (order block, FVG ou faixa OTE).">Entrada (${act})</span></dt><dd>${fmt(b.entry)}</dd>
@@ -507,7 +546,7 @@ function render(x){
    <dt><span data-tip="O máximo que você perde se o stop for atingido, calculado a partir do seu capital e do risco por operação. Em setup B ou sinal ainda não ativado, usa metade do risco.">Perda máxima${mult?'':' (se ativar)'}</span></dt><dd>US$ ${fmt(riskUsd,2)}</dd>
    <dt><span data-tip="Valor total da ordem. Com alavancagem, a margem exigida é menor, mas o risco continua o mesmo.">Tamanho da ordem</span></dt><dd>US$ ${fmt(pos,0)} <span class="mu">${fmt(pos/b.entry,5)}</span></dd>
   </dl>
-  <div class="note">Parciais: 50% no TP1 e stop no breakeven; 30% no TP2; o restante no TP3. A ideia fica inválida se o preço fechar além do stop ou se ninguém preencher a ordem em ${CFG[$('tf').value].ltf==='5m'?'2h':CFG[$('tf').value].ltf==='15m'?'8h':'3 dias'}.</div>`;
+  <div class="note">Parciais: 50% no TP1 e stop no breakeven; 30% no TP2; o restante no TP3. A ideia fica inválida se o preço fechar além do stop ou se ninguém preencher a ordem em ${CFG[$('tf').value].ltf==='5m'?'2h':CFG[$('tf').value].ltf==='15m'?'8h':'3 dias'}.</div></details>`;
   $('scorebar').style.width=b.score*10+'%';
   $('checks').innerHTML=b.sc.map(([p,ok,t])=>`<div class="row"><span class="${ok?'ok':'bad'}">${ok?'✓':'✕'} ${esc(t)}</span><span>${ok?'+'+p:0}/${p}</span></div>`).join('')+
    `<div class="row"><span><b>Total (${b.dir===1?'long':'short'})</b></span><span><b>${b.score}/10</b></span></div>`;
