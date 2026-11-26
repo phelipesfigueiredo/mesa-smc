@@ -218,7 +218,7 @@ if (require.main === module) http.createServer(async (req, res) => {
   if (url.pathname === '/' || url.pathname === '/index.html') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return fs.createReadStream(HTML).pipe(res);
   }
-  const STATIC = { '/manifest.webmanifest': 'application/manifest+json', '/icons/logo.svg': 'image/svg+xml', '/icons/icon-32.png': 'image/png', '/icons/icon-180.png': 'image/png', '/icons/icon-192.png': 'image/png', '/icons/icon-512.png': 'image/png' };
+  const STATIC = { '/sw.js': 'text/javascript', '/manifest.webmanifest': 'application/manifest+json', '/icons/logo.svg': 'image/svg+xml', '/icons/icon-32.png': 'image/png', '/icons/icon-180.png': 'image/png', '/icons/icon-192.png': 'image/png', '/icons/icon-512.png': 'image/png' };
   if (STATIC[url.pathname]) { res.writeHead(200, { 'Content-Type': STATIC[url.pathname], 'Cache-Control': 'public, max-age=86400' }); return fs.createReadStream(path.join(__dirname, url.pathname)).pipe(res); }
   if (url.pathname.startsWith('/api/')) {
     // Só aceita chamadas da própria página (bloqueia outros sites tentando usar o servidor)
