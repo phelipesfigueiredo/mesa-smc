@@ -35,3 +35,9 @@ A conta real fica bloqueada até `ALLOW_LIVE=true` no `.env`. As chaves ficam s�
 ## Aviso
 
 Os sinais são gerados por regras automáticas. A nota de confluência não é probabilidade e nada aqui é recomendação financeira. Teste na conta demo antes de usar dinheiro real.
+
+## Versão online (Vercel)
+
+O repositório publica na Vercel o painel (`index.html`) e as notícias (`api/news.js`).
+Na versão online o envio de ordens para a Bitget fica **desligado** de propósito: as chaves
+e o acompanhamento dos TPs parciais só rodam no servidor local (`npm start`).
