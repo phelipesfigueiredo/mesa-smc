@@ -432,6 +432,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header input, :root:not([data-theme="light"]) header select, :root:not([data-theme="light"]) header .seg, :root:not([data-theme="light"]) header .iconbtn{background:#000!important;border:1px solid rgba(255, :root:not([data-theme="light"]) 255, :root:not([data-theme="light"]) 255, :root:not([data-theme="light"]) .14)!important}}
 .testcyc{display:grid;gap:6px;margin-top:10px;padding:10px 12px;border-radius:12px;border:1px dashed rgba(255,255,255,.18);font-size:.76rem;color:#c7c7cc}
 .testcyc b{font:600 .8rem var(--body);color:#f5f5f3}.testcyc button{justify-self:start}
+.levauto{display:flex;align-items:center;gap:8px;font:500 .76rem var(--body);color:#c7c7cc;cursor:pointer}
+.levauto input{accent-color:#30d158;width:16px;height:16px}
 </style>
 </head>
 <body>
@@ -510,7 +512,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 
       <div class="step"><div class="stepH"><span>2 · Alavancagem</span><b class="levv" id="bglevv">5x</b></div>
         <input id="bglev" type="range" min="1" max="20" step="1" value="5" aria-label="Alavancagem">
-        <div class="ticks"><span>1x</span><span>5x</span><span>10x</span><span>15x</span><span>20x</span></div>
+        <div class="ticks" id="levticks"><span>1x</span><span>5x</span><span>10x</span><span>15x</span><span>20x</span></div>
+        <label class="levauto"><input type="checkbox" id="levauto"> <span id="levautoTxt">Alavancagem automática (a maior segura)</span></label>
       </div>
 
       <div class="outcome" id="bgout"></div>
@@ -1111,9 +1114,21 @@ function bgCalc(){
   const be=rows.length?rows[0].g:0; // TP1 e depois stop no breakeven
   return{P,lev,amt,notional,qty,loss,gain:total,liq,liqBeforeStop,rows,total,be,sh,tps};
 }
+const LEV={max:20,sym:null};
+async function loadLevLimit(){
+  const sym=$('sym').value.trim().toUpperCase();if(!BG.ok||LEV.sym===sym)return;
+  try{const j=await bgcall(`limits?mode=${$('bgmode').value}&symbol=${sym}`);LEV.max=j.maxLev||20;LEV.sym=sym}catch{LEV.max=20}
+  const sl=$('bglev');sl.max=LEV.max;const t=[1,Math.round(LEV.max/4),Math.round(LEV.max/2),Math.round(LEV.max*3/4),LEV.max];
+  $('levticks').innerHTML=t.map(x=>`<span>${x}x</span>`).join('');bgPreview();
+}
+// maior alavancagem em que a liquidação fica pelo menos 2x mais longe que o stop (e dentro do limite da Bitget)
+function safeLev(P){if(!P)return 5;const stop=Math.abs(P.entry-P.stop)/P.entry;if(!(stop>0))return 5;return Math.max(1,Math.min(LEV.max,Math.floor(0.9/(stop*2))))}
+function levAutoApply(){if(!$('levauto').checked||!window.PLAN)return;const v=safeLev(window.PLAN);if(+$('bglev').value!==v){$('bglev').value=v;if(typeof amtMode!=='undefined'&&amtMode==='risk')setRiskAmount()}}
 function bgPreview(){
+  levAutoApply();
   const c=bgCalc();if(!c)return;const {P}=c;
   $('bglevv').textContent=c.lev+'x';
+  $('levautoTxt').textContent=`Alavancagem automática (a maior segura${LEV.sym?` · máx. Bitget ${LEV.max}x`:''}): ${safeLev(P)}x`;
   const cap=+$('cap').value||0,rp=+$('risk').value||1,lossPct=cap?c.loss/cap*100:0;
   const side=P.dir===1?'<span class="ok">comprar (long)</span>':'<span class="bad">vender (short)</span>';
   let warns='';
@@ -1143,7 +1158,7 @@ function setRiskAmount(){
 async function bgTest(){
   if(!onServer){$('bgconn').textContent='offline';return}
   try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;BG.avail=+j.available;if(amtMode==='risk')setRiskAmount();$('bgavail').textContent='saldo US$ '+fmt(BG.avail,2);$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
-    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);}
+    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);LEV.sym=null;loadLevLimit();}
   catch(e){BG.ok=false;$('bgconn').textContent='erro';$('bgconn').className='pill2 bad';$('bghint').textContent='Falha: '+e.message;bglog('Erro: '+e.message)}
   bgPreview();
 }
@@ -1158,6 +1173,10 @@ async function bgSend(auto){
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
 $('bgtest').onclick=bgTest;
+const levKey=()=>'smc_levauto_'+$('tf').value;
+const levInit=()=>{let v=null;try{v=localStorage.getItem(levKey())}catch{}$('levauto').checked=v===null?$('tf').value==='scalp':v==='1';bgPreview()};
+$('levauto').onchange=()=>{try{localStorage.setItem(levKey(),$('levauto').checked?'1':'0')}catch{}bgPreview()};
+$('tf').addEventListener('change',levInit);levInit();
 $('bgcycle').onclick=async e=>{
   const b=e.target;if($('bgmode').value!=='demo'){bglog('O teste de ciclo só funciona com a conta Demo selecionada');return}
   if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='Confirmar: abrir compra mínima na demo';setTimeout(()=>{b.dataset.ok='';b.textContent='Testar ciclo na demo'},6000);return}
@@ -1267,6 +1286,7 @@ async function start(){
   catch(e){$('status').innerHTML=`<span class="bad">Erro ao buscar ${esc(sym)}: ${esc(e.message)}. A Binance bloqueia alguns países, como os EUA.</span>`;return}
   chart.applyOptions({watermark:{text:sym+' · '+cfg.ltf}});$('tvsym').textContent=sym;document.querySelectorAll('#tvtf button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===$('tf').value));
   CUR_SYM=sym;resetChartFor(sym,C.at(-1).c);
+  if(typeof loadLevLimit==='function'){LEV.sym=null;loadLevLimit()}
   cs.setData(C.map(k=>({time:k.t,open:k.o,high:k.h,low:k.l,close:k.c})));
   vs.setData(C.map(k=>({time:k.t,value:k.v,color:k.c>=k.o?TH.vu:TH.vd})));
   chart.timeScale().setVisibleLogicalRange({from:Math.max(0,C.length-160),to:C.length+8});legend(C.at(-1));

@@ -171,7 +171,7 @@ async function placeOrder(o) {
   const mode = o.mode === 'live' ? 'live' : 'demo';
   if (!/^[A-Z0-9]{2,20}USDT$/.test(o.symbol)) throw new Error('Par inválido');
   const side = o.side === 'buy' ? 'buy' : o.side === 'sell' ? 'sell' : null; if (!side) throw new Error('Lado inválido');
-  const price = +o.price, sl = +o.sl, lev = Math.min(Math.max(+o.leverage || 1, 1), 50);
+  const price = +o.price, sl = +o.sl; let lev = Math.max(Math.round(+o.leverage || 1), 1);
   const tps = (Array.isArray(o.tps) ? o.tps : [o.tp]).map(Number).filter(x => x > 0);
   const shares = (Array.isArray(o.shares) && o.shares.length === tps.length ? o.shares : tps.map((_, i, a) => i === a.length - 1 ? 0 : 0)).map(Number);
   const tp = tps[tps.length - 1];
@@ -193,7 +193,10 @@ async function placeOrder(o) {
     if ((pos || []).some(p => +(p.total || 0) > 0)) throw new Error(`Já existe posição aberta em ${m.symbol}`);
   } catch (e) { if (/^Já existe/.test(e.message)) throw e; console.warn('checagem de ordens abertas:', e.message); }
   if (!ct) throw new Error('Contrato não encontrado: ' + m.symbol);
-  const pp = +ct.pricePlace, vp = +ct.volumePlace, min = +ct.minTradeNum;
+  const pp = +ct.pricePlace, vp = +ct.volumePlace, min = +ct.minTradeNum, maxLev = +(ct.maxLever || 50);
+  if (lev > maxLev) lev = maxLev;
+  // nunca deixar a liquidação ficar antes do stop: liquidação aproximada a ~90% de 1/alavancagem
+  const stopDist = Math.abs(price - sl) / price; if (0.9 / lev < stopDist * 1.5) lev = Math.max(1, Math.floor(0.9 / (stopDist * 1.5)));
   const size = o.minSize ? round(Math.max(min * 4, +o.size || 0), vp) : round(+o.size, vp); if (!(size >= min)) throw new Error(`Quantidade ${size} abaixo do mínimo ${min}`);
 
   const st = st0;
@@ -343,6 +346,12 @@ if (require.main === module) http.createServer(async (req, res) => {
         // muda sempre que o app é atualizado (o servidor reinicia ou o index.html muda)
         let v = String(BOOT); try { v += '-' + fs.statSync(HTML).mtimeMs; } catch {}
         return send(res, 200, { v });
+      }
+      if (url.pathname === '/api/bitget/limits') {
+        const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo'; await ensureAcct(mode);
+        const sym = String(url.searchParams.get('symbol') || 'BTCUSDT'); if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) throw new Error('Par inválido');
+        const m = market(mode, sym); const [ct] = await pub('/api/v2/mix/market/contracts', { productType: m.productType, symbol: m.symbol });
+        return send(res, 200, { symbol: sym, maxLev: +(ct?.maxLever || 50), minLev: +(ct?.minLever || 1) });
       }
       if (url.pathname === '/api/bitget/open') return send(res, 200, await openState(url.searchParams.get('mode') === 'live' ? 'live' : 'demo'));
       if (url.pathname === '/api/bitget/test-cycle' && req.method === 'POST') {
