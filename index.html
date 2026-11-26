@@ -248,6 +248,14 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .rail .now{top:1px;width:12px;height:12px;border-radius:50%;background:#f5f5f3;box-shadow:0 0 0 3px rgba(255,255,255,.18)}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;margin-right:6px}
 .brand img{display:block;border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.14)}
+.vetos{margin-top:8px;display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:rgba(255,69,58,.1);color:var(--short);font-size:.82rem}
+.vetos b{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase}
+.btline{font:400 .76rem var(--body);color:#c7c7cc;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}
+.bt{width:100%;border-collapse:collapse;font:400 .8rem var(--mono);font-variant-numeric:tabular-nums}
+.bt th{font:600 .62rem var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:4px 6px}
+.bt td{text-align:right;padding:7px 6px;border-top:1px solid var(--line)}
+.bt th:first-child,.bt td:first-child{text-align:left}
+.tablewrap{overflow-x:auto}
 </style>
 </head>
 <body>
@@ -278,7 +286,10 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 <div class="main">
   <div style="display:grid;gap:18px;min-width:0"><div class="panel" style="padding:10px"><div class="tvbar"><span class="symb" id="tvsym">BTCUSDT</span><span class="tvtf" id="tvtf"><button type="button" data-s="scalp">5m</button><button type="button" data-s="day">15m</button><button type="button" data-s="swing">1h</button></span><span class="legend" id="legend"></span></div><div id="chart"></div></div>
   <div class="panel news ink"><h2>Notícias que movem o mercado</h2><div class="movers" id="movers"><div class="mu">carregando…</div></div><div class="subh">Últimas <span id="newsmeta" style="text-transform:none;letter-spacing:0;font-weight:400"></span></div><ul id="news"></ul></div>
-    <div class="panel gray"><h2><span data-tip="Checklist do método SMC. Cada item cumprido soma pontos. 8 ou mais: setup forte. 6 ou 7: operar com metade do risco. Abaixo de 6: não operar.">Por que esse sinal? Checklist</span></h2><div class="bar"><i id="scorebar" style="width:0"></i></div><div class="list" id="checks" style="margin-top:8px"></div></div></div>
+    <div class="panel gray"><h2><span data-tip="Checklist do método SMC. Cada item cumprido soma pontos. 8 ou mais: setup forte. 6 ou 7: operar com metade do risco. Abaixo de 6: não operar.">Por que esse sinal? Checklist</span></h2><div class="bar"><i id="scorebar" style="width:0"></i></div><div class="list" id="checks" style="margin-top:8px"></div></div>
+    <div class="panel gray"><h2><span data-tip="Roda as mesmas regras do motor nos últimos ~3.000 candles desta moeda e tempo, sem olhar o futuro, e mostra como teriam se saído.">Validação das regras no histórico</span></h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" id="btrun" class="chip" style="cursor:pointer">Testar nesta moeda e tempo</button><span class="note">Leva alguns segundos.</span></div>
+      <div id="btout" style="display:grid;gap:8px;margin-top:10px"></div></div></div>
   <div style="display:grid;gap:14px;align-content:start">
 
     <div class="verdict v-wait" id="verdict"><div class="mu">Analisando…</div></div>
@@ -327,11 +338,11 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 </div>
 
 <script>
-const CFG={scalp:{ltf:'5m',htf:'1h'},day:{ltf:'15m',htf:'4h'},swing:{ltf:'1h',htf:'1d'}};
+const CFG={scalp:{ltf:'5m',mtf:'15m',htf:'1h',valid:24},day:{ltf:'15m',mtf:'1h',htf:'4h',valid:32},swing:{ltf:'1h',mtf:'4h',htf:'1d',valid:72}};
 const $=id=>document.getElementById(id);
 const fmt=(n,d)=>{if(!isFinite(n))return'—';d=d??(Math.abs(n)>=1000?1:Math.abs(n)>=1?3:decimalsFor(Math.abs(n)));return n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let NEWS_SRC='',NEWS_AT=null,NEWS_COIN='BTC';let C=[],H=[],ws,deriv={},news=[],lines=[],timers=[];
+let NEWS_SRC='',NEWS_AT=null,NEWS_COIN='BTC';let C=[],H=[],M=[],BT=null,ws,deriv={},news=[],lines=[],timers=[];
 
 /* ---------- chart ---------- */
 const chart=LightweightCharts.createChart($("chart"),{autoSize:true,layout:{background:{type:'solid',color:'transparent'},textColor:'#787b86',fontFamily:'-apple-system,BlinkMacSystemFont,"Trebuchet MS",Roboto,Ubuntu,sans-serif',fontSize:12},
@@ -396,6 +407,17 @@ setInterval(loadFx,120000);
 /* ---------- data ---------- */
 const parse=k=>({t:k[0]/1000,o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5],tb:+k[9]});
 async function kl(sym,tf,lim){const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${lim}`);if(!r.ok)throw new Error('Binance '+r.status);return(await r.json()).map(parse)}
+async function klLong(sym,tf,total){
+  let out=[],end=null;
+  while(out.length<total){
+    const lim=Math.min(1000,total-out.length);
+    const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${lim}${end?`&endTime=${end}`:''}`);
+    if(!r.ok)throw new Error('Binance '+r.status);
+    const a=(await r.json()).map(parse);if(!a.length)break;
+    out=a.concat(out);end=a[0].t*1000-1;if(a.length<lim)break;
+  }
+  return out;
+}
 async function loadDeriv(sym){
   try{
     const [p,oi]=await Promise.all([
@@ -474,62 +496,174 @@ function sweep(c,piv){
     for(const s of piv.hi)if(s.i<i-2&&c[i].h>s.p&&c[i].c<s.p&&!res.bear)res.bear={i,p:s.p,t:c[i].t};
   }return res;
 }
-function htfBias(h){
-  const cl=h.map(x=>x.c),e50=ema(cl,50).at(-1),e200=ema(cl,200).at(-1),s=structure(h);
-  let b=0;if(s.trend===1&&cl.at(-1)>e50)b=1;if(s.trend===-1&&cl.at(-1)<e50)b=-1;
-  return{b,trend:s.trend,e50,e200,last:s.events.at(-1),piv:pivots(h)};
+function trendState(h){
+  const cl=h.map(x=>x.c),e50=ema(cl,50),e200=ema(cl,200),s=structure(h),n=h.length;
+  const emaDir=cl[n-1]>e50[n-1]&&e50[n-1]>e200[n-1]?1:cl[n-1]<e50[n-1]&&e50[n-1]<e200[n-1]?-1:0;
+  const slope=e50[n-1]-e50[Math.max(0,n-11)];
+  return{trend:s.trend,emaDir,slope:slope>0?1:slope<0?-1:0,e50:e50[n-1],e200:e200[n-1],piv:pivots(h),last:s.events.at(-1)};
 }
+function volumeProfile(c,bins=30){
+  const w=c.slice(-300),lo=Math.min(...w.map(x=>x.l)),hi=Math.max(...w.map(x=>x.h)),step=(hi-lo)/bins||1,v=new Array(bins).fill(0);
+  w.forEach(x=>{const tp=(x.h+x.l+x.c)/3;v[Math.min(bins-1,Math.floor((tp-lo)/step))]+=x.v});
+  let p=v.indexOf(Math.max(...v)),L=p,R=p,acc=v[p];const tot=v.reduce((s,x)=>s+x,0);
+  while(acc<tot*0.7&&(L>0||R<bins-1)){const l=L>0?v[L-1]:-1,r=R<bins-1?v[R+1]:-1;if(r>=l){R++;acc+=v[R]}else{L--;acc+=v[L]}}
+  return{poc:lo+(p+.5)*step,val:lo+L*step,vah:lo+(R+1)*step};
+}
+function chopCount(E21,E50,k=60){let n=E21.length,c=0;for(let i=Math.max(1,n-k);i<n;i++){if(Math.sign(E21[i]-E50[i])!==Math.sign(E21[i-1]-E50[i-1]))c++}return c}
+
+// Motor de decisão. Função pura: recebe candles e contexto, devolve os dois planos (long e short) e o melhor.
+function engine(c,Hc,Mc,ctx={}){
+  const n=c.length,px=c[n-1].c,cl=c.map(x=>x.c);
+  const A=atr(c),a=A[n-1],R=rsi(c),E21=ema(cl,21),E50=ema(cl,50),E200=ema(cl,200),VW=vwapDaily(c);
+  const st=structure(c),piv={hi:st.hi,lo:st.lo},htf=htfBias(Hc),mtf=Mc&&Mc.length>60?trendState(Mc):null;
+  const zones=[...orderBlocks(c,st.events),...fvgs(c)];
+  const liq=liquidity(c,piv,a),sw=sweep(c,piv),vp=volumeProfile(c);
+  const rh=Math.max(...c.slice(-120).map(x=>x.h)),rl=Math.min(...c.slice(-120).map(x=>x.l)),eqm=(rh+rl)/2;
+  const vAvg=c.slice(-21,-1).reduce((s,x)=>s+x.v,0)/20,relV=c[n-1].v/vAvg;
+  const cvd=c.slice(-20).reduce((s,x)=>s+(2*x.tb-x.v),0);
+  const hr=new Date(c[n-1].t*1000).getUTCHours(),session=hr>=7&&hr<12?'Londres':hr>=12&&hr<21?'Nova York':'Ásia',goodSession=hr>=7&&hr<20;
+  const chop=chopCount(E21,E50),atrMed=A.slice(-100).slice().sort((x,y)=>x-y)[50]||a;
+  const extLevels=[...liq.map(l=>l.p),...htf.piv.hi.slice(-6).map(x=>x.p),...htf.piv.lo.slice(-6).map(x=>x.p)];
+  const htfName=ctx.htf||'HTF',mtfName=ctx.mtf||'MTF';
+
+  function plan(dir){
+    const sc=[],vetos=[],L=dir===1?'alta':'baixa';
+    // 1) Contexto de tempo gráfico maior (2): estrutura + médias alinhadas
+    let g=(htf.trend===dir?1:0)+(htf.emaDir===dir?1:0);
+    sc.push([2,g,`${htfName}: estrutura ${htf.trend===1?'de alta':htf.trend===-1?'de baixa':'indefinida'}, médias ${htf.emaDir===1?'alinhadas para cima':htf.emaDir===-1?'alinhadas para baixo':'cruzadas'}`]);
+    if(htf.trend===-dir&&htf.emaDir===-dir)vetos.push(`${htfName} inteiro contra a operação`);
+    if(mtf&&mtf.trend===-dir&&mtf.slope===-dir)vetos.push(`${mtfName} em tendência contrária`);
+    // 2) Varredura de liquidez (2): externa vale 2, interna vale 1
+    let ext=null;for(let i=n-1;i>=n-25&&i>0&&!ext;i--){for(const lv of extLevels){if(dir===1?c[i].l<lv&&c[i].c>lv:c[i].h>lv&&c[i].c<lv){ext={i,p:lv};break}}}
+    const s=dir===1?sw.bull:sw.bear,swp=ext||s;
+    sc.push([2,ext?2:s?1:0,ext?`Varreu liquidez externa em ${fmt(ext.p)}`:s?`Varreu liquidez interna em ${fmt(s.p)}`:'Sem varredura recente']);
+    // 3) Deslocamento com quebra de estrutura (2): forte vale 2, simples vale 1
+    const ev=[...st.events].reverse().find(e=>e.dir===dir&&n-e.i<60);let disp=0;
+    if(ev){const body=Math.max(...c.slice(Math.max(ev.from,ev.i-3),ev.i+1).map(x=>Math.abs(x.c-x.o)));const fvgIn=zones.some(z=>z.kind==='FVG'&&z.dir===dir&&z.i>=ev.from&&z.i<=ev.i+2);disp=(body>=1.2*A[ev.i]||fvgIn)?2:1}
+    sc.push([2,disp,ev?`${ev.type} de ${L} em ${fmt(ev.lvl)}${disp===2?' com deslocamento forte':''}`:'Sem quebra de estrutura a favor']);
+    // 4) Zona de entrada (2): OB/FVG em discount/premium (1) + dentro da OTE 0,62–0,79 (1)
+    let legLo=rl,legHi=rh;if(ev){const seg=c.slice(ev.from);legLo=Math.min(...seg.map(x=>x.l));legHi=Math.max(...seg.map(x=>x.h))}
+    const ote=dir===1?{bot:legHi-(legHi-legLo)*0.79,top:legHi-(legHi-legLo)*0.62}:{bot:legLo+(legHi-legLo)*0.62,top:legLo+(legHi-legLo)*0.79};
+    const cand=zones.filter(z=>z.dir===dir&&(dir===1?z.top<px+a*0.3&&z.top<=eqm:z.bot>px-a*0.3&&z.bot>=eqm)&&Math.abs((z.top+z.bot)/2-px)<=a*8);
+    const overl=z=>Math.min(z.top,ote.top)-Math.max(z.bot,ote.bot)>0;
+    let z=cand.filter(overl).sort((x,y)=>(x.kind==='OB'?0:1)-(y.kind==='OB'?0:1))[0]||cand.sort((x,y)=>dir===1?y.top-x.top:x.bot-y.bot).find(z=>z.kind==='OB')||cand[0];
+    const zp=z?(overl(z)?2:1):0;
+    sc.push([2,zp,z?`${z.kind} em ${dir===1?'discount':'premium'} ${fmt(z.bot)}–${fmt(z.top)}${zp===2?' dentro da OTE':''}`:`Sem OB/FVG em ${dir===1?'discount':'premium'}`]);
+    // 5) Fluxo (1): CVD a favor e derivativos sem lotação do mesmo lado
+    const d=ctx.deriv||{};const cvdOk=dir===1?cvd>0:cvd<0;const fund=isFinite(d.funding)?(dir===1?d.funding<0.03:d.funding>-0.03):true;
+    sc.push([1,cvdOk&&fund?1:0,`CVD ${cvd>0?'+':''}${fmt(cvd,0)}${isFinite(d.funding)?` · funding ${fmt(d.funding,4)}%`:''}`]);
+    if(isFinite(d.funding)&&(dir===1?d.funding>0.08:d.funding<-0.08))vetos.push('Funding extremo: o mercado já está lotado desse lado');
+    // 6) Janela (1)
+    sc.push([1,goodSession&&!ctx.hot?1:0,ctx.hot?'Evento macro recente nas notícias':`Sessão ${session}`]);
+    const score=sc.reduce((t,x)=>t+x[1],0);
+
+    if(!z){z={...ote,kind:'OTE',dir}}
+    const entry=dir===1?z.top-(z.top-z.bot)*0.5:z.bot+(z.top-z.bot)*0.5;
+    const swingStop=dir===1?Math.min(z.bot,...(swp?[c[swp.i].l]:[])):Math.max(z.top,...(swp?[c[swp.i].h]:[]));
+    const stop=dir===1?swingStop-a*0.3:swingStop+a*0.3;
+    const risk=Math.abs(entry-stop),fee=entry*0.0012;
+    if(risk<a*0.4)vetos.push('Stop curto demais para a volatilidade atual (ruído pode tirar)');
+    if(fee/risk>0.2)vetos.push(`Stop muito próximo: as taxas comeriam ${fmt(fee/risk*100,0)}% do risco`);
+    if(risk>a*5)vetos.push('Stop longo demais: risco desproporcional');
+    if(chop>=5)vetos.push('Mercado lateral: médias cruzando toda hora');
+    if(a<atrMed*0.5)vetos.push('Volatilidade muito baixa: movimento sem força');
+    if(dir===1?R[n-1]>78:R[n-1]<22)vetos.push(`RSI ${fmt(R[n-1],0)} esticado a favor: entrada atrasada`);
+    const tg=[...liq.filter(l=>dir===1?l.p>entry:l.p<entry).map(l=>({p:l.p,n:l.name})),
+      ...(dir===1?piv.hi.filter(x=>x.p>entry).map(x=>({p:x.p,n:'Swing high'})):piv.lo.filter(x=>x.p<entry).map(x=>({p:x.p,n:'Swing low'}))),
+      ...[['POC',vp.poc],['VAH',vp.vah],['VAL',vp.val]].filter(([,p])=>dir===1?p>entry:p<entry).map(([k,p])=>({p,n:'Volume Profile '+k})),
+      {p:dir===1?rh:rl,n:dir===1?'Topo do range':'Fundo do range'},
+      ...(dir===1?htf.piv.hi.filter(x=>x.p>entry).map(x=>({p:x.p,n:'Swing high '+htfName})):htf.piv.lo.filter(x=>x.p<entry).map(x=>({p:x.p,n:'Swing low '+htfName})))]
+      .sort((x,y)=>dir===1?x.p-y.p:y.p-x.p);
+    const rrOf=p=>(Math.abs(p-entry)-fee)/(risk+fee);
+    const usable=tg.filter(t=>rrOf(t.p)>=1);
+    const tp=[usable[0],usable.find(t=>rrOf(t.p)>=2)||usable[1],usable.find(t=>rrOf(t.p)>=3)||usable.at(-1)].filter(Boolean);
+    const uniq=[...new Map(tp.map(t=>[t.p.toPrecision(8),t])).values()].sort((x,y)=>dir===1?x.p-y.p:y.p-x.p);
+    const main=uniq.find(t=>rrOf(t.p)>=2)||uniq.at(-1);
+    const rr=main?rrOf(main.p):0;
+    // obstáculo: zona contrária ainda não testada entre a entrada e o alvo 1
+    const block=uniq[0]&&zones.find(o=>o.dir===-dir&&!o.mit&&(dir===1?o.bot>entry&&o.bot<uniq[0].p:o.top<entry&&o.top>uniq[0].p));
+    if(block)vetos.push(`${block.kind} contrário em ${fmt(block.bot)}–${fmt(block.top)} no caminho do alvo 1`);
+    const inZone=dir===1?px<=z.top+a*0.1&&px>=z.bot-a*0.1:px>=z.bot-a*0.1&&px<=z.top+a*0.1;
+    return{dir,score,sc,vetos,z,entry,stop,tps:uniq,main,rr,inZone};
+  }
+  const Lp=plan(1),Sp=plan(-1);
+  const rank=p=>p.score-(p.vetos.length?3:0);
+  const best=rank(Lp)>rank(Sp)||(rank(Lp)===rank(Sp)&&htf.emaDir>=0)?Lp:Sp;
+  return{px,a,R:R[n-1],E21,E200,VW,relV,cvd,st,zones,liq,htf,mtf,vp,best,L:Lp,S:Sp,eqm,rh,rl,session,hot:!!ctx.hot};
+}
+function htfBias(h){const t=trendState(h);return{b:t.trend===t.emaDir?t.trend:0,...t}}
 
 function analyze(){try{analyzeCore()}catch(e){console.error(e);$('status').innerHTML='<span class="bad">Falha na análise: '+esc(e.message)+'</span>'}}
 function analyzeCore(){
   if(C.length<210||H.length<60)return;
-  const c=C,n=c.length,px=c[n-1].c,cl=c.map(x=>x.c);
-  const A=atr(c),a=A[n-1],R=rsi(c),E21=ema(cl,21),E50=ema(cl,50),E200=ema(cl,200),VW=vwapDaily(c);
-  const st=structure(c),piv={hi:st.hi,lo:st.lo},htf=htfBias(H);
-  const zones=[...orderBlocks(c,st.events),...fvgs(c)];
-  const liq=liquidity(c,piv,a),sw=sweep(c,piv);
-  const rh=Math.max(...c.slice(-120).map(x=>x.h)),rl=Math.min(...c.slice(-120).map(x=>x.l)),eqm=(rh+rl)/2;
-  const vAvg=c.slice(-21,-1).reduce((s,x)=>s+x.v,0)/20,relV=c[n-1].v/vAvg;
-  const cvd=c.slice(-20).reduce((s,x)=>s+(2*x.tb-x.v),0);
-  const lastEv=st.events.at(-1);
-  const hr=new Date().getUTCHours(),session=hr>=7&&hr<16?'Londres':hr>=12&&hr<21?'Nova York':hr>=16&&hr<21?'Nova York':'Ásia';
-  const goodSession=hr>=7&&hr<20;
+  const cfg=CFG[$('tf').value];
   const hot=(news||[]).some(x=>/FOMC|CPI|Fed |payroll|rate decision|SEC /i.test(x.title)&&(Date.now()/1000-x.published_on)<6*3600);
+  const x=engine(C,H,M,{deriv,hot,htf:cfg.htf,mtf:cfg.mtf});
+  x.session=x.session;render(x);
+}
 
-  function plan(dir){
-    const sc=[];
-    const htfOk=htf.b===dir;sc.push([2,htfOk,`HTF ${CFG[$('tf').value].htf} ${htf.b===1?'altista':htf.b===-1?'baixista':'neutro'}`]);
-    const s=dir===1?sw.bull:sw.bear;sc.push([2,!!s,s?`Varreu ${fmt(s.p)} e fechou de volta`:'Sem varredura recente']);
-    const evOk=lastEv&&lastEv.dir===dir&&n-lastEv.i<60;sc.push([2,evOk,lastEv?`${lastEv.type} ${lastEv.dir===1?'alta':'baixa'} em ${fmt(lastEv.lvl)}`:'Sem quebra de estrutura']);
-    const cand=zones.filter(z=>z.dir===dir&&(dir===1?z.top<px+a*0.3:z.bot>px-a*0.3)&&(dir===1?z.top<=eqm:z.bot>=eqm)&&Math.abs((z.top+z.bot)/2-px)<=a*8)
-      .sort((x,y)=>dir===1?y.top-x.top:x.bot-y.bot);
-    let z=cand.find(z=>z.kind==='OB')||cand[0];
-    const inDisc=!!z;sc.push([2,inDisc,z?`${z.kind} em ${dir===1?'discount':'premium'} ${fmt(z.bot)}–${fmt(z.top)}`:`Sem OB/FVG em ${dir===1?'discount':'premium'}`]);
-    const fOk=(dir===1?cvd>0:cvd<0)&&(isFinite(deriv.funding)?(dir===1?deriv.funding<0.05:deriv.funding>-0.05):true);
-    sc.push([1,fOk,`CVD ${cvd>0?'+':''}${fmt(cvd,0)} · funding ${isFinite(deriv.funding)?fmt(deriv.funding,4)+'%':'n/d'}`]);
-    sc.push([1,goodSession&&!hot,hot?'Evento macro recente nas notícias':`Sessão ${session}`]);
-    const score=sc.reduce((s,[p,ok])=>s+(ok?p:0),0);
-    if(!z){const fb=dir===1?{top:eqm-(eqm-rl)*0.62,bot:eqm-(eqm-rl)*0.79}:{bot:eqm+(rh-eqm)*0.62,top:eqm+(rh-eqm)*0.79};z={...fb,kind:'OTE',dir}}
-    const entry=dir===1?z.top-(z.top-z.bot)*0.5:z.bot+(z.top-z.bot)*0.5;
-    const swingStop=dir===1?Math.min(z.bot,...(s?[c[s.i].l]:[])):Math.max(z.top,...(s?[c[s.i].h]:[]));
-    const stop=dir===1?swingStop-a*0.3:swingStop+a*0.3;
-    const tg=[...liq.filter(l=>dir===1?l.p>entry:l.p<entry).map(l=>({p:l.p,n:l.name})),
-      ...(dir===1?piv.hi.filter(h=>h.p>entry).map(h=>({p:h.p,n:'Swing high'})):piv.lo.filter(h=>h.p<entry).map(h=>({p:h.p,n:'Swing low'}))),
-      {p:dir===1?rh:rl,n:dir===1?'Topo do range':'Fundo do range'},
-      ...(dir===1?htf.piv.hi.filter(h=>h.p>entry).map(h=>({p:h.p,n:'Swing high HTF'})):htf.piv.lo.filter(h=>h.p<entry).map(h=>({p:h.p,n:'Swing low HTF'})))]
-      .sort((x,y)=>dir===1?x.p-y.p:y.p-x.p);
-    const risk=Math.abs(entry-stop),fee=entry*0.0015;
-    const usable=tg.filter(t=>(Math.abs(t.p-entry)-fee)/(risk+fee)>=1);
-    const tp=[usable[0],usable.find(t=>(Math.abs(t.p-entry)-fee)/(risk+fee)>=2)||usable[1],usable.at(-1)].filter(Boolean);
-    const uniq=[...new Map(tp.map(t=>[t.p.toFixed(6),t])).values()].sort((x,y)=>dir===1?x.p-y.p:y.p-x.p);
-    const main=uniq.find(t=>(Math.abs(t.p-entry)-fee)/(risk+fee)>=2)||uniq.at(-1);
-    const rr=main?(Math.abs(main.p-entry)-fee)/(risk+fee):0;
-    const inZone=dir===1?px<=z.top+a*0.1&&px>=z.bot-a*0.1:px>=z.bot-a*0.1&&px<=z.top+a*0.1;
-    return{dir,score,sc,z,entry,stop,tps:uniq,main,rr,inZone};
+/* ---------- validação histórica (backtest) ---------- */
+// Simula as mesmas regras do motor candle a candle no passado, sem olhar o futuro:
+// ordem limitada na entrada (válida por N candles), stop, parciais 50/30/20 nos alvos e stop no breakeven após o TP1.
+// Se o mesmo candle toca stop e alvo, conta como stop (conservador). Taxas de 0,12% ida e volta já descontadas.
+async function backtest(c,Hc,Mc,cfg,onProg){
+  const trades=[],step=2,win=400,valid=cfg.valid;let i=Math.max(260,Math.floor(c.length*0)),evals=0;
+  while(i<c.length-2){
+    if(++evals%15===0){onProg&&onProg(i/c.length);await new Promise(r=>setTimeout(r,0))}
+    const t=c[i].t,sub=c.slice(Math.max(0,i-win),i+1),hh=Hc.filter(x=>x.t+tfSec(cfg.htf)<=t).slice(-300),mm=Mc.filter(x=>x.t+tfSec(cfg.mtf)<=t).slice(-300);
+    if(hh.length<60){i+=step;continue}
+    const b=engine(sub,hh,mm,{htf:cfg.htf,mtf:cfg.mtf}).best;
+    if(b.score<6||b.rr<2||b.vetos.length||!b.tps.length){i+=step;continue}
+    const dir=b.dir,tps=b.tps.map(x=>x.p);let filled=-1,j=i+1;
+    for(;j<Math.min(c.length,i+1+valid);j++){
+      if(dir===1?c[j].h>=tps[0]:c[j].l<=tps[0])break;           // fugiu sem nós
+      if(dir===1?c[j].l<=b.entry:c[j].h>=b.entry){filled=j;break}
+    }
+    if(filled<0){i+=step;continue}
+    const risk=Math.abs(b.entry-b.stop),shares=tps.length===1?[1]:tps.length===2?[.5,.5]:[.5,.3,.2];
+    let rem=1,Rr=0,sl=b.stop,k=0,exitJ=filled;
+    for(j=filled;j<c.length;j++){
+      exitJ=j;
+      if(dir===1?c[j].l<=sl:c[j].h>=sl){Rr+=rem*(sl-b.entry)*dir/risk;rem=0;break}
+      while(k<tps.length&&(dir===1?c[j].h>=tps[k]:c[j].l<=tps[k])){const part=k===tps.length-1?rem:shares[k];Rr+=part*(tps[k]-b.entry)*dir/risk;rem-=part;if(k===0)sl=b.entry;k++}
+      if(rem<=1e-9)break;
+      if(j-filled>300){Rr+=rem*(c[j].c-b.entry)*dir/risk;rem=0;break}
+    }
+    if(rem>0)Rr+=rem*(c[c.length-1].c-b.entry)*dir/risk;
+    Rr-=b.entry*0.0012/risk;
+    trades.push({t:c[filled].t,dir,score:b.score,R:Rr,setup:b.score>=8?'A':'B'});
+    i=exitJ+1;
   }
-  const L=plan(1),S=plan(-1);
-  const best=(L.score>S.score||(L.score===S.score&&htf.b>=0))?L:S;
-  render({px,a,R:R[n-1],E21,E200,VW,relV,cvd,st,zones,liq,htf,best,eqm,rh,rl,session,hot});
+  onProg&&onProg(1);
+  return trades;
+}
+function tfSec(tf){const n=parseInt(tf),u=tf.slice(-1);return n*(u==='m'?60:u==='h'?3600:u==='d'?86400:604800)}
+function btStats(tr){
+  const n=tr.length,w=tr.filter(t=>t.R>0),l=tr.filter(t=>t.R<=0),gw=w.reduce((s,t)=>s+t.R,0),gl=-l.reduce((s,t)=>s+t.R,0);
+  let eq=0,pk=0,dd=0;tr.forEach(t=>{eq+=t.R;pk=Math.max(pk,eq);dd=Math.min(dd,eq-pk)});
+  return{n,wr:n?w.length/n:NaN,exp:n?(gw-gl)/n:NaN,pf:gl?gw/gl:(gw?Infinity:NaN),dd,total:eq,aw:w.length?gw/w.length:NaN,al:l.length?-gl/l.length:NaN};
+}
+async function runBacktest(){
+  const sym=$('sym').value.trim().toUpperCase(),cfg=CFG[$('tf').value],btn=$('btrun');
+  btn.disabled=true;$('btout').innerHTML='<div class="mu">Baixando histórico…</div>';
+  try{
+    const [c,hh,mm]=await Promise.all([klLong(sym,cfg.ltf,3000),klLong(sym,cfg.htf,1000),klLong(sym,cfg.mtf,1500)]);
+    const tr=await backtest(c,hh,mm,cfg,p=>{$('btout').innerHTML=`<div class="mu">Testando as regras no passado… ${Math.round(p*100)}%</div><div class="bar"><i style="width:${p*100}%"></i></div>`});
+    const s=btStats(tr),A=btStats(tr.filter(t=>t.setup==='A')),B=btStats(tr.filter(t=>t.setup==='B'));
+    const days=(c.at(-1).t-c[0].t)/86400;
+    BT={sym,tf:$('tf').value,...s,days};
+    const row=(k,x)=>`<tr><td>${k}</td><td>${x.n}</td><td>${fmt(x.wr*100,0)}%</td><td class="${x.exp>0?'ok':'bad'}">${x.exp>0?'+':''}${fmt(x.exp,2)}R</td><td>${isFinite(x.pf)?fmt(x.pf,2):'—'}</td><td class="bad">${fmt(x.dd,1)}R</td></tr>`;
+    const verdict=s.n<30?`<div class="warn">Amostra pequena (${s.n} trades). Ainda não dá para confiar no resultado: teste outras moedas ou o estilo de tempo menor para ter mais operações.</div>`
+      :s.exp>0.15&&s.pf>1.3?`<div class="warn" style="background:rgba(52,199,89,.12);color:var(--long)">Regras com vantagem estatística nesta moeda e neste tempo (expectativa positiva em ${s.n} trades). Ainda assim, valide na conta demo.</div>`
+      :`<div class="warn bad">Sem vantagem clara nesta moeda e neste tempo. Prefira não operar este par com estas regras.</div>`;
+    $('btout').innerHTML=`<div class="note">${sym} · ${cfg.ltf} · últimos ${fmt(days,0)} dias · ${c.length} candles</div>
+     <div class="tablewrap"><table class="bt"><thead><tr><th></th><th>Trades</th><th>Acerto</th><th>Expectativa</th><th>Profit factor</th><th>Queda máx.</th></tr></thead><tbody>
+     ${row('Todos',s)}${row('Setup A (8+)',A)}${row('Setup B (6–7)',B)}</tbody></table></div>
+     <div class="note">Resultado acumulado: <b class="${s.total>0?'ok':'bad'}">${s.total>0?'+':''}${fmt(s.total,1)}R</b> · ganho médio ${fmt(s.aw,2)}R · perda média ${fmt(s.al,2)}R. 1R = o valor que você arrisca por operação.</div>${verdict}
+     <div class="note">Simulação conservadora: ordem limitada, taxas de 0,12%, stop considerado primeiro quando o candle toca stop e alvo. Usa só preço e volume (sem funding e notícias do passado). Resultado passado não garante resultado futuro.</div>`;
+    analyze();
+  }catch(e){$('btout').innerHTML=`<div class="warn bad">Falha no teste: ${esc(e.message)}</div>`}
+  btn.disabled=false;
 }
 
 /* ---------- render ---------- */
@@ -541,7 +675,7 @@ function render(x){
   const side=b.dir===1?'COMPRA':'VENDA';
   let cls,head,sub;
   const act=b.dir===1?'comprar':'vender',dist=(b.entry/px-1)*100;
-  if(mult===0||b.rr<2){cls='v-wait';head='ESPERAR';sub=b.rr<2&&mult>0?`R:R líquido ${fmt(b.rr,2)} abaixo de 1:2.`:`Confluência ${b.score}/10 é insuficiente. Abaixo está o cenário de ${side.toLowerCase()} que ativaria o trade.`}
+  if(mult===0||b.rr<2||b.vetos.length){cls='v-wait';head='ESPERAR';sub=b.rr<2&&mult>0?`R:R líquido ${fmt(b.rr,2)} abaixo de 1:2.`:`Confluência ${b.score}/10 é insuficiente. Abaixo está o cenário de ${side.toLowerCase()} que ativaria o trade.`}
   else if(b.inZone){cls=b.dir===1?'v-buy':'v-sell';head=b.dir===1?'COMPRAR AGORA':'VENDER AGORA';sub=`Preço dentro da zona. Setup ${b.score>=8?'A':'B (meia mão)'} · ${b.score}/10`}
   else{cls=b.dir===1?'v-buy':'v-sell';head=b.dir===1?'AGUARDAR PARA COMPRAR':'AGUARDAR PARA VENDER';sub=`Ordem em ${fmt(b.entry)}, aguardando o preço voltar à zona · ${b.score}/10${b.score<8?' · meia mão':''}`}
   window.__planPrev=window.PLAN;window.PLAN={sym:$('sym').value.trim().toUpperCase(),dir:b.dir,entry:b.entry,stop:b.stop,tp:b.tps[0]?.p,tps:b.tps.map(t=>t.p),size:pos/b.entry,usd:pos,risk:riskUsd,score:b.score,active:cls!=='v-wait',inZone:b.inZone,head};if(typeof amtMode!=='undefined'&&amtMode==='risk')setRiskAmount();bgPreview();
@@ -550,7 +684,7 @@ function render(x){
   const dtxt=`${dist>0?'+':''}${fmt(dist,2)}% do preço atual`;
   const ago=Math.abs(dist)<0.05?'no preço':`${dist>0?'+':''}${fmt(dist,2)}% do preço`;
   let hint;
-  if(cls==='v-wait')hint=b.rr<2&&mult>0?`Retorno baixo (R:R ${fmt(b.rr,1)}). Não vale o risco.`:`Sinal fraco. Só vale ${act} se chegar a ${fmt(b.entry)} e a nota subir.`;
+  if(cls==='v-wait')hint=b.vetos.length?`Bloqueado: ${b.vetos[0]}.`:b.rr<2&&mult>0?`Retorno baixo (R:R ${fmt(b.rr,1)}). Não vale o risco.`:`Sinal fraco. Só vale ${act} se chegar a ${fmt(b.entry)} e a nota subir.`;
   else if(b.inZone)hint=`Preço já está na zona. ${b.score>=8?'Setup forte, risco cheio.':'Setup médio, use metade do risco.'}`;
   else hint=`Coloque uma ordem limitada e espere o preço vir até a entrada.${b.score<8?' Use metade do risco.':''}`;
   const pts=[b.stop,b.entry,px,...b.tps.map(t=>t.p)],mn=Math.min(...pts),mx=Math.max(...pts),pos_=p=>((p-mn)/(mx-mn||1)*100).toFixed(1)+'%';
@@ -567,6 +701,7 @@ function render(x){
    <div><small>Alvo 1</small><b class="ok">${fmt(b.tps[0]?.p)}</b><span>R:R ${fmt(b.rr,1)}</span></div>
   </div>
   ${rail}
+  ${BT&&BT.sym===$('sym').value.trim().toUpperCase()&&BT.tf===$('tf').value?`<div class="btline">Histórico destas regras aqui: <b>${BT.n}</b> trades · acerto ${fmt(BT.wr*100,0)}% · expectativa <b class="${BT.exp>0?'ok':'bad'}">${BT.exp>0?'+':''}${fmt(BT.exp,2)}R</b>${BT.n<30?' · amostra pequena':''}</div>`:''}
   <details class="planmore"><summary>Plano completo</summary>
   <dl class="plan">
    <dt>Preço agora</dt><dd>${fmt(px)}</dd>
@@ -579,7 +714,8 @@ function render(x){
   </dl>
   <div class="note">Parciais: 50% no TP1 e stop no breakeven; 30% no TP2; o restante no TP3. A ideia fica inválida se o preço fechar além do stop ou se ninguém preencher a ordem em ${CFG[$('tf').value].ltf==='5m'?'2h':CFG[$('tf').value].ltf==='15m'?'8h':'3 dias'}.</div></details>`;
   $('scorebar').style.width=b.score*10+'%';
-  $('checks').innerHTML=b.sc.map(([p,ok,t])=>`<div class="row"><span class="${ok?'ok':'bad'}">${ok?'✓':'✕'} ${esc(t)}</span><span>${ok?'+'+p:0}/${p}</span></div>`).join('')+
+  $('checks').innerHTML=b.sc.map(([p,g,t])=>`<div class="row"><span class="${g===p?'ok':g>0?'mid':'bad'}">${g===p?'✓':g>0?'◐':'✕'} ${esc(t)}</span><span>${g>0?'+'+g:0}/${p}</span></div>`).join('')+
+   (b.vetos.length?`<div class="vetos"><b>Bloqueios (travam a operação mesmo com nota alta)</b>${b.vetos.map(v=>`<div>⛔ ${esc(v)}</div>`).join('')}</div>`:'<div class="note ok" style="margin-top:6px">Nenhum bloqueio de risco ativo.</div>')+
    `<div class="row"><span><b>Total (${b.dir===1?'long':'short'})</b></span><span><b>${b.score}/10</b></span></div>`;
 
   const zs=x.zones.slice().sort((p,q)=>q.top-p.top);
@@ -744,8 +880,8 @@ async function start(){
   const sym=$('sym').value.trim().toUpperCase(),cfg=CFG[$('tf').value];
   timers.forEach(clearInterval);timers=[];if(ws)ws.close();
   $('status').textContent='carregando…';
-  if(sym!==CUR_SYM){C=[];H=[];cs.setData([]);vs.setData([]);[e21,e200,vw].forEach(s=>s.setData([]));lines.forEach(l=>cs.removePriceLine(l));lines=[];cs.setMarkers([])}
-  try{[C,H]=await Promise.all([kl(sym,cfg.ltf,1000),kl(sym,cfg.htf,500)])}
+  if(sym!==CUR_SYM){C=[];H=[];M=[];cs.setData([]);vs.setData([]);[e21,e200,vw].forEach(s=>s.setData([]));lines.forEach(l=>cs.removePriceLine(l));lines=[];cs.setMarkers([])}
+  try{[C,H,M]=await Promise.all([kl(sym,cfg.ltf,1000),kl(sym,cfg.htf,500),kl(sym,cfg.mtf,500)])}
   catch(e){$('status').innerHTML=`<span class="bad">Erro ao buscar ${esc(sym)}: ${esc(e.message)}. A Binance bloqueia alguns países, como os EUA.</span>`;return}
   chart.applyOptions({watermark:{text:sym+' · '+cfg.ltf}});$('tvsym').textContent=sym;document.querySelectorAll('#tvtf button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===$('tf').value));
   CUR_SYM=sym;resetChartFor(sym,C.at(-1).c);
@@ -759,7 +895,7 @@ async function start(){
     if(arr===C){cs.update({time:bar.t,open:bar.o,high:bar.h,low:bar.l,close:bar.c});vs.update({time:bar.t,value:bar.v,color:bar.c>=bar.o?TH.vu:TH.vd})}
     legend(C.at(-1));$('status').innerHTML=`<b>● ao vivo</b> ${fmt(bar.c)} · ${new Date().toLocaleTimeString('pt-BR')}`;schedule()};
   ws.onclose=()=>{$('status').innerHTML='<span class="mid">desconectado, reconectando…</span>';setTimeout(()=>{if(ws.readyState===3)start()},5000)};
-  timers.push(setInterval(()=>loadDeriv(sym).then(analyze),60000),setInterval(()=>loadNews(sym),300000));
+  timers.push(setInterval(()=>kl(sym,cfg.mtf,500).then(x=>{M=x}).catch(()=>{}),300000),setInterval(()=>loadDeriv(sym).then(analyze),60000),setInterval(()=>loadNews(sym),300000));
 }
 const COINS=['BTC','ETH','SOL','BNB','XRP','DOGE','ADA','LINK'];
 $('chips').innerHTML=COINS.map(c=>`<button type="button" class="chip" data-c="${c}USDT">${c}</button>`).join('');
@@ -770,6 +906,7 @@ function setMode(m){document.body.classList.toggle('simple',m==='simple');$('mSi
 $('mSimple').onclick=()=>setMode('simple');$('mAdv').onclick=()=>setMode('adv');
 let m0='simple';try{m0=localStorage.getItem('smc_mode')||'simple'}catch{}
 document.body.classList.toggle('simple',m0==='simple');$('mSimple').setAttribute('aria-pressed',m0==='simple');$('mAdv').setAttribute('aria-pressed',m0!=='simple');
+$('btrun').onclick=runBacktest;
 applyTheme();loadFx();
 $('go').onclick=start;$('tf').onchange=start;$('sym').onkeydown=e=>{if(e.key==='Enter')start()};
 $('cap').oninput=$('risk').oninput=analyze;
