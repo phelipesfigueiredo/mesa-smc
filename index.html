@@ -499,6 +499,38 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 :root:not([data-theme="light"]) h2,:root:not([data-theme="light"]) .mu,:root:not([data-theme="light"]) .note,:root:not([data-theme="light"]) .kpi small,:root:not([data-theme="light"]) .kpi span,:root:not([data-theme="light"]) .jhead small,:root:not([data-theme="light"]) small{color:#a8a8ad}
 :root:not([data-theme="light"]) .tvbar,:root:not([data-theme="light"]) .row,:root:not([data-theme="light"]) .bt td{border-color:rgba(255,255,255,.1)!important}
 }
+
+/* ---------- alto contraste leve (acessibilidade) ---------- */
+:root{--muted:#5c5c63;--line:rgba(0,0,0,.12);--long:#15803d;--short:#c62828;--warn:#9a6700}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.mu,.note,small,h2,.kpi span,.jhead small,.kpi small,.stepH .mu,.posm,.legend,.ticks,.chipleg,.alstat{color:var(--muted)}
+h2,.kpi small,.jhead small,.keynums small,.mygrid small,.obox small,.gpill b,.vlabel,.subh{font-size:.68rem!important;letter-spacing:.09em}
+.note,.posm,.twf,.chipleg,.alstat{font-size:.78rem}
+.panel{border-color:rgba(0,0,0,.1)}
+.row,.bt td,.plan dt,.plan dd{border-color:var(--line)}
+:focus-visible{outline:2px solid #0a84ff!important;outline-offset:2px!important;border-radius:6px}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{box-shadow:0 0 0 4px rgba(10,132,255,.25)!important}
+.ok{color:var(--long)}.bad{color:var(--short)}.mid{color:var(--warn)}
+:root[data-theme="dark"]{--muted:#b8b8be;--line:rgba(255,255,255,.16);--long:#3ee06a;--short:#ff6a5f;--warn:#ffd84d;--fg:#f7f7f9}
+:root[data-theme="dark"] .mu,:root[data-theme="dark"] .note,:root[data-theme="dark"] small,:root[data-theme="dark"] h2,:root[data-theme="dark"] .kpi span,:root[data-theme="dark"] .jhead small,:root[data-theme="dark"] .kpi small,:root[data-theme="dark"] .posm,:root[data-theme="dark"] .legend,:root[data-theme="dark"] .ticks,:root[data-theme="dark"] .chipleg,:root[data-theme="dark"] .alstat,:root[data-theme="dark"] .verdict .mu,:root[data-theme="dark"] .verdict .note,:root[data-theme="dark"] .verdict .plan dt,:root[data-theme="dark"] .hint{color:#b8b8be!important}
+:root[data-theme="dark"] .panel,:root[data-theme="dark"] .panel.gray,:root[data-theme="dark"] .panel.ink,:root[data-theme="dark"] .verdict,:root[data-theme="dark"] header{border-color:rgba(255,255,255,.18)!important}
+:root[data-theme="dark"] .keynums div,:root[data-theme="dark"] .mygrid div,:root[data-theme="dark"] .obox,:root[data-theme="dark"] .pos,:root[data-theme="dark"] .kpi,:root[data-theme="dark"] .jcard,:root[data-theme="dark"] .chip:not([aria-pressed="true"]),:root[data-theme="dark"] .fxbar,:root[data-theme="dark"] .almin,:root[data-theme="dark"] .albtn:not([aria-pressed="true"]),:root[data-theme="dark"] header input,:root[data-theme="dark"] header select,:root[data-theme="dark"] .money,:root[data-theme="dark"] .bg select,:root[data-theme="dark"] .bg input{border-color:rgba(255,255,255,.16)!important}
+:root[data-theme="dark"] .ok,:root[data-theme="dark"] .verdict .ok{color:#3ee06a!important}.bad,.verdict .bad{color:#ff6a5f!important}.mid{color:#ffd84d!important}
+:root[data-theme="dark"] .row,:root[data-theme="dark"] .bt td,:root[data-theme="dark"] .plan dt,:root[data-theme="dark"] .plan dd,:root[data-theme="dark"] .tvbar{border-color:rgba(255,255,255,.12)!important}
+@media (prefers-color-scheme: dark){
+:root:not([data-theme="light"]){--muted:#b8b8be;--line:rgba(255,255,255,.16);--long:#3ee06a;--short:#ff6a5f;--warn:#ffd84d;--fg:#f7f7f9}
+:root:not([data-theme="light"]) .mu,:root:not([data-theme="light"]) .note,:root:not([data-theme="light"]) small,:root:not([data-theme="light"]) h2,:root:not([data-theme="light"]) .kpi span,:root:not([data-theme="light"]) .jhead small,:root:not([data-theme="light"]) .kpi small,:root:not([data-theme="light"]) .posm,:root:not([data-theme="light"]) .legend,:root:not([data-theme="light"]) .ticks,:root:not([data-theme="light"]) .chipleg,:root:not([data-theme="light"]) .alstat,:root:not([data-theme="light"]) .verdict .mu,:root:not([data-theme="light"]) .verdict .note,:root:not([data-theme="light"]) .verdict .plan dt,:root:not([data-theme="light"]) .hint{color:#b8b8be!important}
+:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray,:root:not([data-theme="light"]) .panel.ink,:root:not([data-theme="light"]) .verdict,:root:not([data-theme="light"]) header{border-color:rgba(255,255,255,.18)!important}
+:root:not([data-theme="light"]) .keynums div,:root:not([data-theme="light"]) .mygrid div,:root:not([data-theme="light"]) .obox,:root:not([data-theme="light"]) .pos,:root:not([data-theme="light"]) .kpi,:root:not([data-theme="light"]) .jcard,:root:not([data-theme="light"]) .chip:not([aria-pressed="true"]),:root:not([data-theme="light"]) .fxbar,:root:not([data-theme="light"]) .almin,:root:not([data-theme="light"]) .albtn:not([aria-pressed="true"]),:root:not([data-theme="light"]) header input,:root:not([data-theme="light"]) header select,:root:not([data-theme="light"]) .money,:root:not([data-theme="light"]) .bg select,:root:not([data-theme="light"]) .bg input{border-color:rgba(255,255,255,.16)!important}
+:root:not([data-theme="light"]) .ok,:root:not([data-theme="light"]) .verdict .ok{color:#3ee06a!important}.bad,.verdict .bad{color:#ff6a5f!important}.mid{color:#ffd84d!important}
+:root:not([data-theme="light"]) .row,:root:not([data-theme="light"]) .bt td,:root:not([data-theme="light"]) .plan dt,:root:not([data-theme="light"]) .plan dd,:root:not([data-theme="light"]) .tvbar{border-color:rgba(255,255,255,.12)!important}
+}
+@media (prefers-contrast: more){
+ :root{--muted:#3a3a40;--line:rgba(0,0,0,.28)}
+ .panel,.kpi,.jcard,.pos{border-width:1.5px!important}
+ :root[data-theme="dark"],:root:not([data-theme="light"]){--muted:#d6d6db;--line:rgba(255,255,255,.3)}
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mu,:root:not([data-theme="light"]) .note,:root:not([data-theme="light"]) small,:root:not([data-theme="light"]) h2{color:#d6d6db!important}}
 </style>
 </head>
 <body>
