@@ -51,3 +51,12 @@ Configure em **Vercel → projeto mesa-smc → Settings → Environment Variable
 - `APP_USER`: o usuário (opcional, padrão `mesa`)
 
 Depois de salvar, faça um novo deploy (Deployments → ⋯ → Redeploy) para valer.
+
+## Deixar sempre ligado no Mac
+
+```bash
+npm run instalar     # liga agora e sempre que você entrar no Mac; reinicia sozinho se cair
+npm run reiniciar    # depois de git pull ou de mudar o .env
+npm run log          # ver o que o servidor está fazendo
+npm run desinstalar  # desliga e remove
+```
