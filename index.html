@@ -349,18 +349,6 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 @keyframes rdl{to{opacity:.2;transform:translateY(-4px)}}
 .mover,[data-read]{cursor:pointer}
 .mover:hover{background:rgba(255,255,255,.09)}
-.social{display:grid;gap:8px}
-.xlist{display:grid;gap:8px}
-.xscroll{max-height:520px;overflow:auto;overscroll-behavior:contain;padding-right:2px}
-.tw{display:grid;gap:6px;padding:12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);content-visibility:auto;contain-intrinsic-size:auto 120px}
-.twh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.82rem}
-.twh b{font:600 .86rem var(--display)}
-.av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#2c2c2e;color:#f5f5f3;font:700 .62rem var(--body)}
-.twh .tag{font:600 .6rem var(--body);letter-spacing:.06em;padding:2px 7px;border-radius:99px;background:rgba(255,255,255,.08);color:#c7c7cc}
-.twt{margin:0;font:400 .9rem/1.5 var(--body);white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
-.twf{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.72rem}
-.twf .mu{margin-right:auto}
-.social .mini{padding:5px 10px;border-radius:8px;font:600 .72rem var(--body);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:#f5f5f3;cursor:pointer;text-decoration:none}
 </style>
 </head>
 <body>
@@ -410,11 +398,6 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 <div class="main">
   <div style="display:grid;gap:18px;min-width:0"><div class="panel" style="padding:10px"><div class="tvbar"><span class="symb" id="tvsym">BTCUSDT</span><span class="tvtf" id="tvtf"><button type="button" data-s="scalp">5m</button><button type="button" data-s="day">15m</button><button type="button" data-s="swing">1h</button></span><span class="legend" id="legend"></span></div><div id="chart"></div></div>
   <div class="panel news ink"><h2>Notícias que movem o mercado</h2><div class="movers" id="movers"><div class="mu">carregando…</div></div><div class="subh">Últimas <span id="newsmeta" style="text-transform:none;letter-spacing:0;font-weight:400"></span></div><ul id="news"></ul></div>
-  <div class="panel ink social" id="social">
-    <div class="stepH"><h2 style="margin:0">No X agora</h2><span class="mu" id="xmeta"></span></div>
-    <div class="subh">Movendo o mercado</div><div id="xtop" class="xlist"></div>
-    <div class="subh">Mais recentes</div><div id="xall" class="xlist xscroll"><div class="mu">carregando…</div></div>
-  </div>
     <div class="panel gray"><h2><span data-tip="Checklist do método SMC. Cada item cumprido soma pontos. 8 ou mais: setup forte. 6 ou 7: operar com metade do risco. Abaixo de 6: não operar.">Por que esse sinal? Checklist</span></h2><div class="bar"><i id="scorebar" style="width:0"></i></div><div class="list" id="checks" style="margin-top:8px"></div></div>
     <div class="panel gray"><h2><span data-tip="Roda as mesmas regras do motor nos últimos ~3.000 candles desta moeda e tempo, sem olhar o futuro, e mostra como teriam se saído.">Validação das regras no histórico</span></h2>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" id="btrun" class="chip" style="cursor:pointer">Testar nesta moeda e tempo</button><span class="note">Leva alguns segundos.</span></div>
@@ -1286,43 +1269,7 @@ $('mSimple').onclick=()=>setMode('simple');$('mAdv').onclick=()=>setMode('adv');
 let m0='simple';try{m0=localStorage.getItem('smc_mode')||'simple'}catch{}
 document.body.classList.toggle('simple',m0==='simple');$('mSimple').setAttribute('aria-pressed',m0==='simple');$('mAdv').setAttribute('aria-pressed',m0!=='simple');
 $('btrun').onclick=runBacktest;
-/* ---------- tweets ---------- */
-const XS={data:null,tr:{}};
-const agoTxt=s=>{const m=Math.max(0,Math.round((Date.now()/1000-s)/60));return m<60?m+' min':m<1440?Math.round(m/60)+' h':Math.round(m/1440)+' d'};
-function tweetCard(t,score){
-  const sc=score?scoreNews({title:t.text,body:'',published_on:t.at}):null,tr=XS.tr[t.id];
-  const ini=(t.name||t.user||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
-  return`<article class="tw" data-id="${esc(t.id)}">
-    <div class="twh"><span class="av">${ini}</span><b>${esc(t.name||t.user)}</b><span class="mu">@${esc(t.user)} · ${agoTxt(t.at)}</span>${t.cat?`<span class="tag">${esc(t.cat)}</span>`:''}
-      ${sc&&sc.dir?`<span class="dir ${sc.dir>0?'ok':'bad'}">${sc.dir>0?'▲ alta':'▼ baixa'}</span>`:''}</div>
-    <p class="twt">${esc(tr&&tr.show?tr.text:t.text)}</p>
-    <div class="twf">${sc&&sc.why.length?`<span class="mu">${esc(sc.why.join(' · '))}</span>`:''}
-      <button type="button" class="mini" data-tw="tr">${tr&&tr.show?'Ver original':tr&&tr.busy?'Traduzindo…':'Traduzir'}</button>
-      <a class="mini" href="${esc(/^https:\/\//.test(t.url)?t.url:'#')}" target="_blank" rel="noopener">Abrir no X ↗</a></div>
-  </article>`;
-}
-function renderX(){
-  const d=XS.data;if(!d)return;
-  if(!d.items?.length){$('xtop').innerHTML='';$('xall').innerHTML=`<div class="warn">Não consegui ler os tweets agora${d.error?': '+esc(d.error):''}.<br>${d.hasKey?'Confira a chave X_BEARER_TOKEN no .env.':'O X não libera leitura gratuita. Para tweets estáveis, coloque uma chave da API oficial do X em X_BEARER_TOKEN no .env (plano pago). Sem ela o app usa espelhos públicos, que às vezes ficam fora do ar.'}</div>`;$('xmeta').textContent='';return}
-  const scored=d.items.map(t=>({t,s:scoreNews({title:t.text,body:'',published_on:t.at}).s})).filter(x=>x.s>=3&&(Date.now()/1000-x.t.at)<24*3600).sort((a,b)=>b.s-a.s).slice(0,4);
-  $('xtop').innerHTML=scored.map(x=>tweetCard(x.t,true)).join('')||'<div class="mu" style="font-size:.82rem">Nenhum tweet de alto impacto nas últimas 24 h.</div>';
-  $('xall').innerHTML=d.items.slice(0,30).map(t=>tweetCard(t,false)).join('');
-  $('xmeta').textContent=`${d.items.length} tweets · ${d.source}`;
-}
-async function loadX(){
-  if(!location.protocol.startsWith('http')){$('xall').innerHTML='<div class="mu">Abra pelo app local ou pela versão online para ver os tweets.</div>';return}
-  try{XS.data=await (await fetch('/api/social',{cache:'no-store'})).json();renderX()}catch(e){$('xall').innerHTML=`<div class="warn">Falha ao carregar tweets: ${esc(e.message)}</div>`}
-}
-$('social').addEventListener('click',async e=>{
-  const b=e.target.closest('[data-tw="tr"]');if(!b)return;const id=b.closest('.tw').dataset.id,t=XS.data.items.find(x=>x.id===id);if(!t)return;
-  const tr=XS.tr[id]||(XS.tr[id]={});
-  if(tr.text){tr.show=!tr.show;return renderX()}
-  tr.busy=true;renderX();
-  try{const r=await fetch('/api/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:[t.text]})});const j=await r.json();if(!r.ok)throw new Error(j.error);tr.text=j.texts[0];tr.show=true}
-  catch(err){toast('Tradução falhou',err.message,null,0)}
-  tr.busy=false;renderX();
-});
-loadX();setInterval(()=>{if(!document.hidden)loadX()},180000);
+
 /* ---------- leitor de notícias com tradução ---------- */
 const RD={cur:null,orig:null,pt:null,lang:'pt',seq:0};
 const apiBase=location.protocol.startsWith('http')?'':null;

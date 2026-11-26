@@ -318,7 +318,6 @@ if (require.main === module) http.createServer(async (req, res) => {
     const origin = req.headers.origin, host = req.headers.host || '';
     if ((origin && origin !== `http://${host}`) || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(res, 403, { error: 'Origem não permitida' });
     try {
-      if (url.pathname === '/api/social') return send(res, 200, await require('./lib/social').getTweets());
       if (url.pathname === '/api/article') { const u = url.searchParams.get('url') || ''; return send(res, 200, await reader.article(u, require('./lib/news').findNews(u))); }
       if (url.pathname === '/api/translate' && req.method === 'POST') {
         let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 4e5) throw new Error('Texto grande demais'); }
