@@ -282,6 +282,17 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .confirm{padding:6px 8px;border-radius:9px;background:rgba(255,69,58,.1)}
 .confirm b{color:#ff6b61}
 [hidden]{display:none!important}
+.mycard{gap:10px}
+.mysum{display:grid;gap:10px}
+.mybig{display:grid;gap:2px}
+.mybig small,.mygrid small{font:500 .6rem var(--body);letter-spacing:.1em;text-transform:uppercase;color:#8e8e93}
+.mybig b{font:700 1.9rem var(--display);letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.05}
+.mybig span{font:600 .85rem var(--mono)}
+.mygrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.mygrid div{background:rgba(255,255,255,.05);border-radius:11px;padding:8px 10px;display:grid;gap:1px;min-width:0}
+.mygrid b{font:600 .92rem var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mygrid span{font:400 .64rem var(--body);color:#8e8e93}
+.pnl small{display:block;text-align:right;font-size:.7rem}
 </style>
 </head>
 <body>
@@ -323,6 +334,12 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <div id="btout" style="display:grid;gap:8px;margin-top:10px"></div></div></div>
   <div style="display:grid;gap:14px;align-content:start">
 
+    <div class="panel bg ink mycard" id="mycard" hidden>
+      <div class="stepH"><h2 style="margin:0">Minhas operações</h2><span><span class="pill2" id="myacct"></span> <button type="button" class="mini" id="bgrefresh">Atualizar</button></span></div>
+      <div class="mysum" id="mysum"></div>
+      <div id="bgpos" class="openbox"></div>
+      <div class="note" id="myat"></div>
+    </div>
     <div class="verdict v-wait" id="verdict"><div class="mu">Analisando…</div></div>
     <div class="panel bg ink" id="bgcard">
       <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0"><span class="stepn">2</span>Operar na Bitget</h2><span class="pill2" id="bgconn">offline</span></div>
@@ -355,10 +372,6 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <div class="btns"><button type="button" id="bgtest">Testar conexão</button><button type="button" class="primary" id="bgsend" disabled>Enviar ordem</button></div>
       <label class="switch">Modo automático<input type="checkbox" id="bgauto" disabled></label>
       <div class="note" id="bghint">Para conectar, rode o servidor local (server.js) e abra http://localhost:8787. Suas chaves ficam só no seu computador.</div>
-      <div class="openbox" id="bgopen" hidden>
-        <div class="stepH"><span>3 · Suas operações abertas</span><button type="button" class="mini" id="bgrefresh">Atualizar</button></div>
-        <div id="bgpos"></div>
-      </div>
       <div class="log" id="bglog"></div>
     </div>
   </div>
@@ -930,14 +943,28 @@ $('bgtest').onclick=bgTest;
 const OPEN={busy:false,confirm:null,timer:null,data:null};
 async function bgOpenLoad(){
   if(!BG.ok||OPEN.busy)return;
-  try{OPEN.data=await bgcall('open?mode='+$('bgmode').value);bgOpenRender()}catch(e){$('bgpos').innerHTML=`<div class="warn bad">Não consegui ler as posições: ${esc(e.message)}</div>`;$('bgopen').hidden=false}
+  try{OPEN.data=await bgcall('open?mode='+$('bgmode').value);bgOpenRender()}catch(e){bglog('Não consegui ler as posições: '+e.message)}
 }
 function bgOpenRender(){
-  const d=OPEN.data;if(!d)return;$('bgopen').hidden=false;
+  const d=OPEN.data;if(!d)return;
+  if(!d.positions.length&&!d.orders.length){$('mycard').hidden=true;return}
+  $('mycard').hidden=false;
+  const tp=d.positions.reduce((t,p)=>t+p.pnl,0),tm=d.positions.reduce((t,p)=>t+p.margin,0),roi=tm?tp/tm*100:0,tn=d.positions.reduce((t,p)=>t+p.total*p.mark,0);
+  const cap=+$('cap').value||0,td=d.today;
+  $('myacct').textContent=$('bgmode').value==='demo'?'DEMO':'REAL';
+  $('mysum').innerHTML=`
+   <div class="mybig"><small>Resultado em aberto</small><b class="${tp>=0?'ok':'bad'}">${tp>=0?'+':'−'}US$ ${fmt(Math.abs(tp),2)}</b><span class="${roi>=0?'ok':'bad'}">ROI ${roi>=0?'+':''}${fmt(roi,2)}%</span></div>
+   <div class="mygrid">
+    <div><small>Posições</small><b>${d.positions.length}</b><span>${d.orders.length} ordem${d.orders.length===1?'':'s'} pendente${d.orders.length===1?'':'s'}</span></div>
+    <div><small>Margem em uso</small><b>US$ ${fmt(tm,0)}</b><span>exposição US$ ${fmt(tn,0)}</span></div>
+    <div><small>Realizado hoje</small>${td?`<b class="${td.pnl>=0?'ok':'bad'}">${td.pnl>=0?'+':'−'}US$ ${fmt(Math.abs(td.pnl),2)}</b><span>${td.count} fechada${td.count===1?'':'s'} · ${td.wins} no lucro${cap?` · ${td.pnl>=0?'+':''}${fmt(td.pnl/cap*100,2)}% da banca`:''}</span>`:'<b>—</b><span>indisponível</span>'}</div>
+   </div>
+   ${td&&cap&&td.pnl/cap*100<=-2?'<div class="warn bad">Você atingiu o limite de perda do dia (2% da banca). Pare de operar hoje.</div>':''}`;
+  $('myat').textContent='Atualizado às '+new Date().toLocaleTimeString('pt-BR');
   const pos=d.positions.map(p=>{
     const k=p.symbol+'|'+p.holdSide,roi=p.margin?p.pnl/p.margin*100:0,c=OPEN.confirm&&OPEN.confirm.k===k?OPEN.confirm.pct:null;
     return`<div class="pos"><div class="posh"><b>${esc(p.symbol.replace(/USDT$/,''))}</b><span class="side ${p.holdSide==='long'?'l':'s'}">${p.holdSide==='long'?'LONG':'SHORT'}</span>${p.leverage?`<span class="mu">${p.leverage}x</span>`:''}
-      <span class="pnl ${p.pnl>=0?'ok':'bad'}">${p.pnl>=0?'+':''}US$ ${fmt(p.pnl,2)} <small>${roi>=0?'+':''}${fmt(roi,1)}%</small></span></div>
+      <span class="pnl ${p.pnl>=0?'ok':'bad'}">${p.pnl>=0?'+':'−'}US$ ${fmt(Math.abs(p.pnl),2)}<small>ROI ${roi>=0?'+':''}${fmt(roi,2)}%</small></span></div>
       <div class="posm"><span>Qtd ${fmt(p.total,5)}</span><span>Entrada ${fmt(p.entry)}</span><span>Agora ${fmt(p.mark)}</span>${p.liq?`<span>Liq. ${fmt(p.liq)}</span>`:''}</div>
       ${c?`<div class="confirm">Fechar <b>${c}%</b> a mercado agora?<button type="button" class="mini dang" data-do="close" data-k="${esc(k)}" data-p="${c}">Sim, fechar</button><button type="button" class="mini" data-do="nope">Não</button></div>`
         :`<div class="closer"><span>Fechar a mercado</span>${[25,50,75,100].map(x=>`<button type="button" class="mini${x===100?' dang':''}" data-do="ask" data-k="${esc(k)}" data-p="${x}">${x}%</button>`).join('')}</div>`}
@@ -947,7 +974,7 @@ function bgOpenRender(){
       ${o.tp||o.sl?`<div class="posm">${o.sl?`<span>Stop ${fmt(o.sl)}</span>`:''}${o.tp?`<span>TP ${fmt(o.tp)}</span>`:''}</div>`:''}
       ${c?`<div class="confirm">Cancelar esta ordem?<button type="button" class="mini dang" data-do="cancel" data-o="${esc(o.orderId)}" data-s="${esc(o.symbol)}">Sim, cancelar</button><button type="button" class="mini" data-do="nope">Não</button></div>`
         :`<div class="closer"><button type="button" class="mini" data-do="askc" data-o="${esc(o.orderId)}">Cancelar ordem</button></div>`}</div>`}).join('');
-  $('bgpos').innerHTML=pos+ord||'<div class="mu" style="font-size:.82rem">Nenhuma posição ou ordem aberta.</div>';
+  $('bgpos').innerHTML=pos+ord||'<div class="mu" style="font-size:.82rem">Nenhuma posição ou ordem aberta agora.</div>';
 }
 $('bgpos').onclick=async e=>{
   const t=e.target.closest('button');if(!t)return;const a=t.dataset.do;

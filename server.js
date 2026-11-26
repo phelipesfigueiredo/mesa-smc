@@ -95,7 +95,17 @@ async function openState(mode) {
     orders = (d?.entrustedList || []).map(o => ({ orderId: o.orderId, symbol: o.symbol, side: o.side, tradeSide: o.tradeSide, price: +o.price, size: +o.size,
       tp: +(o.presetStopSurplusPrice || 0), sl: +(o.presetStopLossPrice || 0), created: +(o.cTime || 0) }));
   } catch (e) { console.warn('ordens pendentes:', e.message); }
-  return { positions, orders, hedge: null };
+  // lucro realizado hoje (posições fechadas desde 00:00 de Brasília)
+  let today = null;
+  try {
+    const brt = new Date(Date.now() - 3 * 3600e3); brt.setUTCHours(0, 0, 0, 0);
+    const start = brt.getTime() + 3 * 3600e3;
+    const hist = await bg(mode, 'GET', '/api/v2/mix/position/history-position', { productType: m.productType, startTime: String(start), endTime: String(Date.now()), limit: '100' });
+    const list = hist?.list || hist || [];
+    today = { pnl: list.reduce((t, x) => t + +(x.netProfit ?? x.pnl ?? 0), 0), count: list.length,
+      wins: list.filter(x => +(x.netProfit ?? x.pnl ?? 0) > 0).length };
+  } catch (e) { console.warn('histórico de hoje:', e.message); }
+  return { positions, orders, today };
 }
 async function closePosition(o) {
   const mode = o.mode === 'live' ? 'live' : 'demo';
