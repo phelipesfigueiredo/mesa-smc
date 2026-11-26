@@ -155,6 +155,18 @@ async function cancelOrder(o) {
   return { canceled: o.orderId };
 }
 
+// Teste do ciclo completo SÓ NA DEMO: compra mínima a mercado com alvos bem perto, para ver parciais e stop no 0x0 acontecendo.
+async function testCycle(o) {
+  if (o.mode !== 'demo') throw new Error('O teste de ciclo só roda na conta demo');
+  await ensureAcct('demo');
+  const sym = /^[A-Z0-9]{2,20}USDT$/.test(o.symbol || '') ? o.symbol : 'BTCUSDT';
+  const m = market('demo', sym);
+  const t = await pub('/api/v2/mix/market/ticker', { productType: m.productType, symbol: m.symbol });
+  const px = +((Array.isArray(t) ? t[0] : t)?.lastPr || 0); if (!(px > 0)) throw new Error('Não consegui ler o preço atual');
+  return placeOrder({ mode: 'demo', symbol: sym, side: 'buy', price: px, market: true, minSize: true, size: 0,
+    sl: px * 0.994, tps: [px * 1.0025, px * 1.004, px * 1.007], shares: [50, 30, 20], leverage: 5, marginMode: 'isolated' });
+}
+
 async function placeOrder(o) {
   const mode = o.mode === 'live' ? 'live' : 'demo';
   if (!/^[A-Z0-9]{2,20}USDT$/.test(o.symbol)) throw new Error('Par inválido');
@@ -182,7 +194,7 @@ async function placeOrder(o) {
   } catch (e) { if (/^Já existe/.test(e.message)) throw e; console.warn('checagem de ordens abertas:', e.message); }
   if (!ct) throw new Error('Contrato não encontrado: ' + m.symbol);
   const pp = +ct.pricePlace, vp = +ct.volumePlace, min = +ct.minTradeNum;
-  const size = round(+o.size, vp); if (!(size >= min)) throw new Error(`Quantidade ${size} abaixo do mínimo ${min}`);
+  const size = o.minSize ? round(Math.max(min * 4, +o.size || 0), vp) : round(+o.size, vp); if (!(size >= min)) throw new Error(`Quantidade ${size} abaixo do mínimo ${min}`);
 
   const st = st0;
   if (size * price / lev > +st.available) throw new Error(`Margem insuficiente: precisa ${(size * price / lev).toFixed(2)}, disponível ${(+st.available).toFixed(2)}`);
@@ -197,6 +209,7 @@ async function placeOrder(o) {
     presetStopSurplusPrice: String(roundP(tp, pp)), presetStopLossPrice: String(roundP(sl, pp)),
     clientOid: 'smc' + Date.now()
   };
+  if (o.market) { body.orderType = 'market'; delete body.price; delete body.force; }
   if (acct?.posMode === 'hedge_mode') body.tradeSide = 'open';
   const r = await bg(mode, 'POST', '/api/v2/mix/order/place-order', null, body);
   // Alvos parciais: só podem ser criados depois que a entrada for executada. Guardamos e acompanhamos.
@@ -208,7 +221,7 @@ async function placeOrder(o) {
   });
   if (partials.length) {
     WATCH.push({ mode, orderId: r.orderId, symbol: m.symbol, productType: m.productType, marginCoin: m.marginCoin, hedge: acct?.posMode === 'hedge_mode',
-      holdSide: side === 'buy' ? 'long' : 'short', side, entry: +body.price, size, pp, vp, partials, beDone: false, state: 'waiting', created: Date.now() });
+      holdSide: side === 'buy' ? 'long' : 'short', side, entry: roundP(price, pp), size, pp, vp, partials, beDone: false, state: 'waiting', created: Date.now() });
     saveWatch();
   }
   console.log(new Date().toISOString(), mode.toUpperCase(), side, size, m.symbol, '@', body.price, 'SL', body.presetStopLossPrice, 'TP', body.presetStopSurplusPrice, '→', r.orderId);
@@ -236,7 +249,9 @@ async function tickWatch(w) {
     const st = o?.state || o?.status;
     if (st === 'canceled' || st === 'cancelled') { w.state = 'closed'; wlog(w, 'entrada cancelada, nada a fazer'); return; }
     if (st !== 'filled') return;
-    w.state = 'open'; wlog(w, 'entrada executada, criando alvos parciais');
+    const avg = +(o?.priceAvg || o?.fillPrice || 0); if (avg > 0) w.entry = roundP(avg, w.pp);
+    if (!(w.entry > 0)) { wlog(w, 'preço de entrada desconhecido; não vou mexer no stop automaticamente'); w.beDone = true; }
+    w.state = 'open'; wlog(w, `entrada executada a ${w.entry}, criando alvos parciais`);
   }
   if (w.state === 'open') {
     for (const p of w.partials) {
@@ -330,6 +345,11 @@ if (require.main === module) http.createServer(async (req, res) => {
         return send(res, 200, { v });
       }
       if (url.pathname === '/api/bitget/open') return send(res, 200, await openState(url.searchParams.get('mode') === 'live' ? 'live' : 'demo'));
+      if (url.pathname === '/api/bitget/test-cycle' && req.method === 'POST') {
+        if (req.headers['content-type'] !== 'application/json') return send(res, 415, { error: 'JSON esperado' });
+        let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 1e4) throw new Error('Corpo grande demais'); }
+        return send(res, 200, await testCycle(JSON.parse(raw)));
+      }
       if ((url.pathname === '/api/bitget/close' || url.pathname === '/api/bitget/cancel') && req.method === 'POST') {
         if (req.headers['content-type'] !== 'application/json') return send(res, 415, { error: 'JSON esperado' });
         let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 1e4) throw new Error('Corpo grande demais'); }

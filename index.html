@@ -430,6 +430,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header{background:#000!important;border:1px solid rgba(255,255,255,.12)!important;box-shadow:none!important;backdrop-filter:none!important}}
 :root[data-theme="dark"] header input, :root[data-theme="dark"] header select, :root[data-theme="dark"] header .seg, :root[data-theme="dark"] header .iconbtn{background:#000!important;border:1px solid rgba(255, :root[data-theme="dark"] 255, :root[data-theme="dark"] 255, :root[data-theme="dark"] .14)!important}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header input, :root:not([data-theme="light"]) header select, :root:not([data-theme="light"]) header .seg, :root:not([data-theme="light"]) header .iconbtn{background:#000!important;border:1px solid rgba(255, :root:not([data-theme="light"]) 255, :root:not([data-theme="light"]) 255, :root:not([data-theme="light"]) .14)!important}}
+.testcyc{display:grid;gap:6px;margin-top:10px;padding:10px 12px;border-radius:12px;border:1px dashed rgba(255,255,255,.18);font-size:.76rem;color:#c7c7cc}
+.testcyc b{font:600 .8rem var(--body);color:#f5f5f3}.testcyc button{justify-self:start}
 </style>
 </head>
 <body>
@@ -520,6 +522,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
           <label>Margem<select id="bgmargin"><option value="isolated">Isolada (recomendado)</option><option value="crossed">Cruzada</option></select></label>
           <label>Máx. ordens/dia<input id="bgmax" type="number" value="3" min="1" max="10"></label>
         </div>
+        <div class="testcyc"><b>Testar o ciclo completo (só demo)</b><span>Abre uma compra mínima de BTC a mercado, com TP1/TP2/TP3 a +0,25%, +0,4% e +0,7% e stop a −0,6%. Serve para ver na Bitget as parciais sendo criadas e o stop indo para o 0x0 depois do TP1.</span>
+          <button type="button" class="mini" id="bgcycle">Testar ciclo na demo</button></div>
       </details>
       <div class="list" id="bgprev"></div>
       <div class="btns"><button type="button" id="bgtest">Testar conexão</button><button type="button" class="primary" id="bgsend" disabled>Enviar ordem</button></div>
@@ -1154,6 +1158,14 @@ async function bgSend(auto){
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
 $('bgtest').onclick=bgTest;
+$('bgcycle').onclick=async e=>{
+  const b=e.target;if($('bgmode').value!=='demo'){bglog('O teste de ciclo só funciona com a conta Demo selecionada');return}
+  if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='Confirmar: abrir compra mínima na demo';setTimeout(()=>{b.dataset.ok='';b.textContent='Testar ciclo na demo'},6000);return}
+  b.dataset.ok='';b.disabled=true;b.textContent='Enviando…';
+  try{const j=await bgcall('test-cycle',{mode:'demo',symbol:'BTCUSDT'});bglog(`TESTE: compra ${fmt(j.size,5)} BTC a mercado · TP final ${j.finalTp} · parciais ${j.partials?.join(', ')||'—'}. Acompanhe em Minhas operações.`);setTimeout(bgOpenLoad,1500)}
+  catch(err){bglog('Teste recusado: '+err.message)}
+  b.disabled=false;b.textContent='Testar ciclo na demo';
+};
 /* ---------- posições abertas: fechar a mercado e cancelar ordens ---------- */
 const OPEN={busy:false,confirm:null,timer:null,data:null};
 async function bgOpenLoad(){
