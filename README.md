@@ -61,3 +61,12 @@ npm run log          # ver o que o servidor está fazendo
 npm run atualizar    # força a atualização agora (ela também roda sozinha a cada 30 s)
 npm run desinstalar  # desliga e remove
 ```
+
+## Diário, travas e planilha
+
+- O servidor lê as operações fechadas na Bitget (demo e real) a cada 2 minutos e monta o diário (`journal.json`, só no seu Mac).
+- Travas (no `.env`): `TRAVA_PERDA_DIA=2`, `TRAVA_PERDA_SEMANA=5`, `TRAVA_RISCO_ABERTO=3`, `TRAVA_STOPS_SEGUIDOS=3`, `TRAVA_PAUSA_MIN=120`.
+  Com uma trava ativa, o servidor recusa novas ordens (manual e automático). Fechar posições continua liberado.
+- Google Sheets: crie uma planilha, abra Extensões → Apps Script, cole `sheets/apps-script.gs`, troque o segredo,
+  implante como App da Web (executar como você, acesso: qualquer pessoa) e coloque a URL e o segredo em
+  `SHEETS_WEBHOOK_URL` e `SHEETS_SECRET` no `.env`.

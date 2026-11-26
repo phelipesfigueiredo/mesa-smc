@@ -4,6 +4,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { getNews, parseRss, findNews } = require('./lib/news');
 const reader = require('./lib/reader');
+const journal = require('./lib/journal');
 
 // --- .env simples ---
 try {
@@ -59,9 +60,9 @@ async function probe(mode) {
     try {
       const acc = await bg(mode, 'GET', '/api/v2/mix/account/accounts', { productType });
       const a = (acc || []).find(x => x.marginCoin === coin) || (acc || [])[0] || {};
-      const av = +(a.available ?? a.crossedMaxAvailable ?? 0);
+      const av = +(a.available ?? a.crossedMaxAvailable ?? 0), eq = +(a.accountEquity ?? a.usdtEquity ?? av);
       tries.push(`V2 ${productType}: ${av}`);
-      if (av > 0) return { kind: 'v2', plain, available: av, tries };
+      if (av > 0 || eq > 0) return { kind: 'v2', plain, available: av, equity: eq, tries };
     } catch (e) { tries.push(`V2 ${productType}: ${e.message}`); }
   }
   try {
@@ -71,7 +72,7 @@ async function probe(mode) {
     const num = v => (v === undefined || v === null || v === '' || isNaN(+v)) ? null : +v;
     const av = [u.available, u.availableBalance, u.free, u.balance, u.equity, u.usdtEquity, d && d.usdtEquity, d && d.accountEquity, d && d.unionAvailable].map(num).find(v => v !== null && v > 0) || 0;
     tries.push(`UTA V3: ${av}`);
-    if (av > 0) return { kind: 'uta', available: av, tries };
+    if (av > 0) return { kind: 'uta', available: av, equity: +(d?.usdtEquity || d?.accountEquity || av), tries };
   } catch (e) { tries.push(`UTA V3: ${e.message}`); }
   return { kind: 'none', available: 0, tries };
 }
@@ -200,6 +201,18 @@ async function placeOrder(o) {
   const size = o.minSize ? round(Math.max(min * 4, +o.size || 0), vp) : round(+o.size, vp); if (!(size >= min)) throw new Error(`Quantidade ${size} abaixo do mínimo ${min}`);
 
   const st = st0;
+  // ---- travas de proteção ----
+  if (!o.skipGuard) {
+    let openRisk = 0;
+    try {
+      const os = await openState(mode);
+      for (const p of os.positions) { const pl = journal._plans().filter(x => x.mode === mode && x.symbol === p.symbol).sort((a, b) => b.created - a.created)[0]; openRisk += pl ? Math.abs(p.entry - pl.stop) * p.total : p.margin; }
+      for (const od of os.orders) if (od.sl) openRisk += Math.abs(od.price - od.sl) * od.size;
+    } catch {}
+    try { await journal.sync(mode, bg, market); } catch (e) { console.warn('diário:', e.message); }
+    const g = journal.guard(mode, ACCT[mode]?.equity || st.available, size * Math.abs(price - sl), openRisk);
+    if (!g.ok) throw new Error('Trava de proteção: ' + g.blocks.map(b => b.msg).join(' '));
+  }
   if (size * price / lev > +st.available) throw new Error(`Margem insuficiente: precisa ${(size * price / lev).toFixed(2)}, disponível ${(+st.available).toFixed(2)}`);
 
   const acct = await bg(mode, 'GET', '/api/v2/mix/account/account', { symbol: m.symbol, productType: m.productType, marginCoin: m.marginCoin });
@@ -215,6 +228,7 @@ async function placeOrder(o) {
   if (o.market) { body.orderType = 'market'; delete body.price; delete body.force; }
   if (acct?.posMode === 'hedge_mode') body.tradeSide = 'open';
   const r = await bg(mode, 'POST', '/api/v2/mix/order/place-order', null, body);
+  journal.addPlan({ mode, orderId: r.orderId, symbol: m.symbol, side, entry: price, stop: sl, tps, score: +o.score || null, tf: o.tf || '', auto: !!o.auto, test: !!o.market });
   // Alvos parciais: só podem ser criados depois que a entrada for executada. Guardamos e acompanhamos.
   const partials = [];
   let left = size;
@@ -323,6 +337,20 @@ async function placeUta(mode, o, side, price, sl, tp, lev, available) {
   return { orderId: (r && (r.orderId || r.clientOid)) || '?', size: qty, symbol };
 }
 
+// ---------- diário: sincroniza com a Bitget e envia para a planilha a cada 2 minutos ----------
+let lastSyncErr = {}, lastTickAt = 0;
+async function journalTick() {
+  lastTickAt = Date.now();
+  for (const mode of ['demo', 'live']) {
+    const p = mode === 'live' ? 'BITGET_' : 'BITGET_DEMO_';
+    if (!process.env[p + 'KEY'] || (mode === 'live' && process.env.ALLOW_LIVE !== 'true')) continue;
+    try { await journal.sync(mode, bg, market); lastSyncErr[mode] = null; } catch (e) { if (lastSyncErr[mode] !== e.message) console.warn(`diário ${mode}:`, e.message); lastSyncErr[mode] = e.message; }
+  }
+  try { const r = await journal.pushSheets(); if (r.sent) console.log(new Date().toISOString(), `planilha: ${r.sent} operação(ões) enviada(s)`); lastSyncErr.sheets = null; }
+  catch (e) { if (lastSyncErr.sheets !== e.message) console.warn('planilha:', e.message); lastSyncErr.sheets = e.message; }
+}
+if (require.main === module) { setTimeout(journalTick, 5000); setInterval(journalTick, 120000).unref(); }
+
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 if (require.main === module) http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -346,6 +374,16 @@ if (require.main === module) http.createServer(async (req, res) => {
         // muda sempre que o app é atualizado (o servidor reinicia ou o index.html muda)
         let v = String(BOOT); try { v += '-' + fs.statSync(HTML).mtimeMs; } catch {}
         return send(res, 200, { v });
+      }
+      if (url.pathname === '/api/journal') {
+        const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo';
+        if (url.searchParams.get('sync') === '1' || Date.now() - lastTickAt > 110000) await journalTick();
+        let openRisk = 0;
+        try { await ensureAcct(mode); const os = await openState(mode);
+          for (const p of os.positions) { const pl = journal._plans().filter(x => x.mode === mode && x.symbol === p.symbol).sort((a, b) => b.created - a.created)[0]; openRisk += pl ? Math.abs(p.entry - pl.stop) * p.total : p.margin; }
+          for (const od of os.orders) if (od.sl) openRisk += Math.abs(od.price - od.sl) * od.size; } catch {}
+        return send(res, 200, { stats: journal.stats(mode), guard: journal.guard(mode, ACCT[mode]?.equity || +(ACCT[mode]?.available || 0), 0, openRisk),
+          sheets: { configured: !!process.env.SHEETS_WEBHOOK_URL, error: lastSyncErr.sheets || null }, syncError: lastSyncErr[mode] || null });
       }
       if (url.pathname === '/api/bitget/limits') {
         const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo'; await ensureAcct(mode);

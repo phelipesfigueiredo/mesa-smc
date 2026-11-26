@@ -4,3 +4,5 @@ node_modules/
 *.log
 watch.json
 sons-exemplo/
+journal.json
+plans.json

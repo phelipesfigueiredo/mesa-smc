@@ -434,6 +434,25 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .testcyc b{font:600 .8rem var(--body);color:#f5f5f3}.testcyc button{justify-self:start}
 .levauto{display:flex;align-items:center;gap:8px;font:500 .76rem var(--body);color:#c7c7cc;cursor:pointer}
 .levauto input{accent-color:#30d158;width:16px;height:16px}
+.jr{display:grid;gap:12px}
+.guards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.gfull{grid-column:1/-1}
+@media(max-width:800px){.guards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.gpill{display:grid;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);position:relative}
+.gpill i{position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%}
+.gpill.ok i{background:#30d158}.gpill.bad i{background:#ff453a;box-shadow:0 0 0 3px rgba(255,69,58,.2)}
+.gpill b{font:600 .7rem var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.gpill span{font:500 .8rem var(--mono)}
+.jstats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+@media(max-width:900px){.jstats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.jstats div{display:grid;gap:2px;padding:8px 10px;border-radius:11px;background:var(--panel2);min-width:0}
+.jstats small,.jgrp small{font:500 .6rem var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.jstats b{font:600 .95rem var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsplit{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.jsplit{grid-template-columns:1fr}}
+.jgrp{display:grid;gap:2px;font-size:.82rem}
+.jr .mini{padding:5px 10px;border-radius:8px;font:600 .72rem var(--body);background:var(--panel2);border:1px solid var(--line);color:var(--fg);cursor:pointer}
+.bg label.levauto{display:flex;grid-template-columns:none;text-transform:none;letter-spacing:0;font:500 .76rem var(--body);color:#c7c7cc}
 </style>
 </head>
 <body>
@@ -488,7 +507,15 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
     <div class="panel gray"><h2><span data-tip="Checklist do método SMC. Cada item cumprido soma pontos. 8 ou mais: setup forte. 6 ou 7: operar com metade do risco. Abaixo de 6: não operar.">Por que esse sinal? Checklist</span></h2><div class="bar"><i id="scorebar" style="width:0"></i></div><div class="list" id="checks" style="margin-top:8px"></div></div>
     <div class="panel gray"><h2><span data-tip="Roda as mesmas regras do motor nos últimos ~3.000 candles desta moeda e tempo, sem olhar o futuro, e mostra como teriam se saído.">Validação das regras no histórico</span></h2>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" id="btrun" class="chip" style="cursor:pointer">Testar nesta moeda e tempo</button><span class="note">Leva alguns segundos.</span></div>
-      <div id="btout" style="display:grid;gap:8px;margin-top:10px"></div></div></div>
+      <div id="btout" style="display:grid;gap:8px;margin-top:10px"></div></div>
+    <div class="panel jr" id="jrPanel">
+      <div class="stepH"><h2 style="margin:0">Diário e proteção</h2><span><span class="pill2" id="jrAcct">DEMO</span> <button type="button" class="mini" id="jrSync">Sincronizar agora</button></span></div>
+      <div class="guards" id="jrGuards"><div class="mu">Conecte a Bitget no app local para ver as travas e o diário.</div></div>
+      <div class="jstats" id="jrStats"></div>
+      <div class="jsplit"><div id="jrSetup"></div><div id="jrSess"></div></div>
+      <div class="tablewrap"><table class="bt" id="jrTable"></table></div>
+      <div class="note" id="jrSheets"></div>
+    </div></div>
   <div style="display:grid;gap:14px;align-content:start">
 
     <div class="panel bg ink mycard" id="mycard" hidden>
@@ -1135,6 +1162,7 @@ function bgPreview(){
   if(c.liqBeforeStop)warns+=`<div class="warn bad">Com ${c.lev}x a liquidação (~${fmt(c.liq)}) vem antes do stop. Diminua a alavancagem.</div>`;
   if(BG.avail!=null&&c.amt>BG.avail)warns+=`<div class="warn bad">Valor maior que o saldo disponível (US$ ${fmt(BG.avail,2)}).</div>`;
   if(lossPct>rp*1.0001&&cap)warns+=`<div class="warn">Se bater o stop, a perda (${fmt(lossPct,2)}% do capital) passa do seu risco de ${fmt(rp,1)}%. Toque em "Pelo risco" para ajustar.</div>`;
+  if(typeof JR!=='undefined'&&JR.blocked)warns+=`<div class="warn bad">🔒 Trava de proteção ativa: ${esc(JR.data.guard.blocks.filter(b=>b.code!=='risco').map(b=>b.msg).join(' '))}</div>`;
   if(!P.active)warns+=`<div class="warn">Sem sinal agora. A ordem só libera quando o card de decisão mostrar compra ou venda.</div>`;
   $('bgout').innerHTML=`<div class="sentence">Vai ${side} <b>${fmt(c.qty,5)} ${esc(P.sym.replace(/USDT$/,''))}</b> em <b>${fmt(P.entry)}</b>, uma posição de <b>US$ ${fmt(c.notional,0)}</b> (US$ ${fmt(c.amt,0)} × ${c.lev}).</div>
    <div class="ogrid">
@@ -1146,7 +1174,7 @@ function bgPreview(){
     <tr class="tot"><td>Total</td><td></td><td>100%</td><td class="ok">+${fmt(c.total,2)}</td><td>+${fmt(c.amt?c.total/c.amt*100:0,1)}%</td></tr>
    </tbody></table>
    <div class="note" style="color:#8e8e93">ROI sobre a margem alocada (US$ ${fmt(c.amt,0)} com ${c.lev}x), já descontando taxas. Depois do TP1 o stop vai para o 0x0 (entrada + taxas): se voltar, o pior caso fica em +US$ ${fmt(c.be,2)}, sem risco no restante.</div>${warns}`;
-  const ok=BG.ok&&P.active&&c.amt>0&&!c.liqBeforeStop&&!(BG.avail!=null&&c.amt>BG.avail);
+  const ok=BG.ok&&P.active&&c.amt>0&&!c.liqBeforeStop&&!(BG.avail!=null&&c.amt>BG.avail)&&!(typeof JR!=='undefined'&&JR.blocked);
   $('bgsend').disabled=!ok;
   $('bgsend').textContent=P.active?(P.dir===1?'Comprar':'Vender')+` · US$ ${fmt(c.amt,0)} × ${c.lev}x`:'Enviar ordem';
   if($('bgauto').checked&&ok)bgSend(true);
@@ -1158,7 +1186,7 @@ function setRiskAmount(){
 async function bgTest(){
   if(!onServer){$('bgconn').textContent='offline';return}
   try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;BG.avail=+j.available;if(amtMode==='risk')setRiskAmount();$('bgavail').textContent='saldo US$ '+fmt(BG.avail,2);$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
-    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);LEV.sym=null;loadLevLimit();}
+    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);LEV.sym=null;loadLevLimit();setTimeout(jrLoad,800);}
   catch(e){BG.ok=false;$('bgconn').textContent='erro';$('bgconn').className='pill2 bad';$('bghint').textContent='Falha: '+e.message;bglog('Erro: '+e.message)}
   bgPreview();
 }
@@ -1168,11 +1196,41 @@ async function bgSend(auto){
   if(BG.sent[key])return;
   const cnt=Object.values(BG.sent).filter(d=>d===today).length;if(cnt>=+$('bgmax').value){if(!auto)bglog('Limite diário de ordens atingido');return}
   BG.sent[key]=today;
-  try{const j=await bgcall('order',{mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,tps:bgCalc().tps,shares:bgCalc().sh,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
+  try{const j=await bgcall('order',{score:P.score,tf:$('tf').value,auto:!!auto,mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,tps:bgCalc().tps,shares:bgCalc().sh,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
     bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId} · TP final ${j.finalTp||'-'}${j.partials?.length?' · parciais quando executar: '+j.partials.join(', '):''}`);setTimeout(bgOpenLoad,1200)}
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
 $('bgtest').onclick=bgTest;
+/* ---------- diário e travas ---------- */
+const JR={data:null,blocked:false};
+async function jrLoad(force){
+  if(!BG.ok)return;
+  try{const j=await bgcall(`../journal?mode=${$('bgmode').value}${force?'&sync=1':''}`);JR.data=j;jrRender()}catch(e){$('jrGuards').innerHTML=`<div class="warn bad">Diário indisponível: ${esc(e.message)}</div>`}
+}
+function jrRender(){
+  const d=JR.data;if(!d)return;const g=d.guard,s=d.stats,R=g.rules;
+  $('jrAcct').textContent=$('bgmode').value==='demo'?'DEMO':'REAL';
+  const pill=(ok,label,val)=>`<div class="gpill ${ok?'ok':'bad'}"><i></i><b>${label}</b><span>${val}</span></div>`;
+  const pct=v=>v==null?'—':(v>=0?'+':'')+fmt(v,2)+'%';
+  const seqBlock=g.blocks.find(b=>b.code==='sequencia');
+  $('jrGuards').innerHTML=pill(!g.blocks.find(b=>b.code==='dia'),'Hoje',`${pct(g.dayPct)} · limite −${R.dayLoss*100}%`)
+    +pill(!g.blocks.find(b=>b.code==='semana'),'Semana',`${pct(g.weekPct)} · limite −${R.weekLoss*100}%`)
+    +pill((g.openRiskPct||0)<R.openRisk*100,'Risco aberto',`${g.openRiskPct==null?'—':fmt(g.openRiskPct,2)+'%'} · limite ${R.openRisk*100}%`)
+    +pill(!seqBlock,'Sequência',seqBlock?'pausa ativa':`pausa após ${R.streak} stops`)
+    +(g.blocks.length?`<div class="warn bad gfull">🔒 ${g.blocks.map(b=>esc(b.msg)).join('<br>')}</div>`:'<div class="note ok gfull">Travas OK: pode operar dentro do plano.</div>');
+  JR.blocked=g.blocks.some(b=>b.code!=='risco');
+  const st=(l,v,c='')=>`<div><small>${l}</small><b class="${c}">${v}</b></div>`;
+  $('jrStats').innerHTML=st('Operações',s.n)+st('Acerto',s.winrate==null?'—':fmt(s.winrate*100,0)+'%')+st('Resultado',`${s.total>=0?'+':'−'}US$ ${fmt(Math.abs(s.total),2)}`,s.total>=0?'ok':'bad')
+    +st('Expectativa',s.expR==null?'—':(s.expR>=0?'+':'')+fmt(s.expR,2)+'R',s.expR>=0?'ok':'bad')+st('Profit factor',s.pf==null?'—':fmt(s.pf,2))+st('Queda máx.',`US$ ${fmt(Math.abs(s.maxDD),2)}`,'bad');
+  const grp=(t,a)=>`<div class="jgrp"><small>${t}</small>${a.length?a.map(x=>`<div class="row"><span>${esc(String(x.k))} <span class="mu">(${x.n})</span></span><span>${fmt(x.wr*100,0)}% · <span class="${x.total>=0?'ok':'bad'}">${x.total>=0?'+':''}${fmt(x.total,2)}</span></span></div>`).join(''):'<div class="mu">—</div>'}</div>`;
+  $('jrSetup').innerHTML=grp('Por setup',s.porSetup);$('jrSess').innerHTML=grp('Por sessão',s.porSessao);
+  $('jrTable').innerHTML=s.ultimas.length?`<thead><tr><th>Fechou</th><th>Moeda</th><th>Lado</th><th>Setup</th><th>Resultado</th><th>R</th></tr></thead><tbody>${s.ultimas.map(j=>`<tr><td>${esc(j.fechamento.slice(5))}</td><td>${esc(j.moeda.replace(/USDT$/,''))}</td><td>${esc(j.lado)}</td><td>${esc(j.setup)}${j.nota!==''?' · '+j.nota:''}</td><td class="${j.resultado_usd>=0?'ok':'bad'}">${j.resultado_usd>=0?'+':''}${fmt(j.resultado_usd,2)}</td><td>${j.resultado_R===''?'—':fmt(j.resultado_R,2)}</td></tr>`).join('')}</tbody>`:'<tbody><tr><td class="mu">Nenhuma operação fechada nos últimos 30 dias.</td></tr></tbody>';
+  $('jrSheets').innerHTML=d.sheets.configured?(d.sheets.error?`<span class="bad">Planilha: ${esc(d.sheets.error)}</span>`:'Planilha do Google conectada: as operações fechadas são enviadas a cada 2 minutos.'):'Planilha do Google ainda não configurada (SHEETS_WEBHOOK_URL no .env).';
+  if(s.n<30)$('jrSheets').innerHTML+=`<br>Amostra de ${s.n} operações: ainda pequena para conclusões (o ideal é 30+ por setup).`;
+  bgPreview();
+}
+$('jrSync').onclick=async e=>{e.target.disabled=true;e.target.textContent='Sincronizando…';await jrLoad(true);e.target.disabled=false;e.target.textContent='Sincronizar agora'};
+setInterval(()=>{if(!document.hidden)jrLoad()},60000);
 const levKey=()=>'smc_levauto_'+$('tf').value;
 const levInit=()=>{let v=null;try{v=localStorage.getItem(levKey())}catch{}$('levauto').checked=v===null?$('tf').value==='scalp':v==='1';bgPreview()};
 $('levauto').onchange=()=>{try{localStorage.setItem(levKey(),$('levauto').checked?'1':'0')}catch{}bgPreview()};
