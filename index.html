@@ -535,7 +535,7 @@ function bgPreview(){
 async function bgTest(){
   if(!onServer){$('bgconn').textContent='offline';return}
   try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
-    $('bghint').textContent=`Saldo disponível: ${fmt(+j.available,2)} USDT.`;bglog('Conexão OK');}
+    $('bghint').textContent=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`;bglog('Conexão OK · '+(j.tries||[]).join(' | '));}
   catch(e){BG.ok=false;$('bgconn').textContent='erro';$('bgconn').className='pill2 bad';$('bghint').textContent='Falha: '+e.message;bglog('Erro: '+e.message)}
   bgPreview();
 }

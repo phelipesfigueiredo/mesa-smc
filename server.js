@@ -24,7 +24,7 @@ function creds(mode) {
 // Na conta demo da Bitget (V2) os contratos usam produto SUSDT-FUTURES e símbolos com S (ex.: SBTCSUSDT).
 // Se sua conta demo usar os nomes normais, defina DEMO_PLAIN_SYMBOLS=true no .env.
 function market(mode, sym) {
-  if (mode === 'live' || process.env.DEMO_PLAIN_SYMBOLS === 'true') return { productType: 'USDT-FUTURES', marginCoin: 'USDT', symbol: sym };
+  if (mode === 'live' || process.env.DEMO_PLAIN_SYMBOLS === 'true' || (ACCT[mode] && (ACCT[mode].plain || ACCT[mode].kind === 'uta'))) return { productType: 'USDT-FUTURES', marginCoin: 'USDT', symbol: sym };
   return { productType: 'SUSDT-FUTURES', marginCoin: 'SUSDT', symbol: 'S' + sym.replace(/USDT$/, '') + 'SUSDT' };
 }
 
@@ -47,11 +47,34 @@ async function pub(reqPath, query) {
 const round = (n, d) => { const f = 10 ** d; return Math.floor(n * f) / f; };
 const roundP = (n, d) => Number(n.toFixed(d));
 
+// Descobre onde está o saldo: conta clássica (V2, demo com S ou com nomes normais) ou Conta Unificada (UTA, V3)
+const ACCT = {};
+async function probe(mode) {
+  const tries = [];
+  const cands = mode === 'live' ? [['USDT-FUTURES', 'USDT', false]] : [['SUSDT-FUTURES', 'SUSDT', false], ['USDT-FUTURES', 'USDT', true]];
+  for (const [productType, coin, plain] of cands) {
+    try {
+      const acc = await bg(mode, 'GET', '/api/v2/mix/account/accounts', { productType });
+      const a = (acc || []).find(x => x.marginCoin === coin) || (acc || [])[0] || {};
+      const av = +(a.available ?? a.crossedMaxAvailable ?? 0);
+      tries.push(`V2 ${productType}: ${av}`);
+      if (av > 0) return { kind: 'v2', plain, available: av, tries };
+    } catch (e) { tries.push(`V2 ${productType}: ${e.message}`); }
+  }
+  try {
+    const d = await bg(mode, 'GET', '/api/v3/account/assets');
+    const list = (d && (d.assets || d.list)) || (Array.isArray(d) ? d : []);
+    const u = list.find(x => String(x.coin || x.marginCoin || '').toUpperCase() === 'USDT') || {};
+    const av = +(u.available ?? u.availableBalance ?? (d && d.usdtEquity) ?? 0);
+    tries.push(`UTA V3: ${av}`);
+    if (av > 0) return { kind: 'uta', available: av, tries };
+  } catch (e) { tries.push(`UTA V3: ${e.message}`); }
+  return { kind: 'none', available: 0, tries };
+}
 async function status(mode) {
-  const m = market(mode, 'BTCUSDT');
-  const acc = await bg(mode, 'GET', '/api/v2/mix/account/accounts', { productType: m.productType });
-  const a = (acc || []).find(x => x.marginCoin === m.marginCoin) || acc?.[0] || {};
-  return { ok: true, mode, available: a.available ?? a.crossedMaxAvailable ?? '0' };
+  const p = await probe(mode); ACCT[mode] = p;
+  console.log(`[${mode}] saldo:`, p.tries.join(' | '));
+  return { ok: true, mode, available: String(p.available), account: p.kind, tries: p.tries };
 }
 
 async function placeOrder(o) {
@@ -61,14 +84,17 @@ async function placeOrder(o) {
   const price = +o.price, sl = +o.sl, tp = +o.tp, lev = Math.min(Math.max(+o.leverage || 1, 1), 50);
   if (!(price > 0 && sl > 0 && tp > 0)) throw new Error('Preços inválidos');
   if (side === 'buy' ? !(sl < price && tp > price) : !(sl > price && tp < price)) throw new Error('Stop/alvo do lado errado da entrada');
+  const st0 = await status(mode);
+  if (st0.account === 'none') throw new Error('Saldo zerado em todos os tipos de conta (' + st0.tries.join(' | ') + ')');
   const m = market(mode, o.symbol);
+  if (st0.account === 'uta') return placeUta(mode, o, side, price, sl, tp, lev, +st0.available);
 
   const [ct] = await pub('/api/v2/mix/market/contracts', { productType: m.productType, symbol: m.symbol });
   if (!ct) throw new Error('Contrato não encontrado: ' + m.symbol);
   const pp = +ct.pricePlace, vp = +ct.volumePlace, min = +ct.minTradeNum;
   const size = round(+o.size, vp); if (!(size >= min)) throw new Error(`Quantidade ${size} abaixo do mínimo ${min}`);
 
-  const st = await status(mode);
+  const st = st0;
   if (size * price / lev > +st.available) throw new Error(`Margem insuficiente: precisa ${(size * price / lev).toFixed(2)}, disponível ${(+st.available).toFixed(2)}`);
 
   const acct = await bg(mode, 'GET', '/api/v2/mix/account/account', { symbol: m.symbol, productType: m.productType, marginCoin: m.marginCoin });
@@ -128,6 +154,26 @@ async function getNews() {
   newsCache = { at: Date.now(), data, errors };
   if (errors.length) console.warn('Feeds com erro:', errors.join(' | '));
   return newsCache;
+}
+
+// Conta Unificada (UTA) — API V3
+async function placeUta(mode, o, side, price, sl, tp, lev, available) {
+  const symbol = o.symbol, category = 'USDT-FUTURES';
+  let pp = 2, vp = 3, min = 0;
+  try {
+    const d = await bg(mode, 'GET', '/api/v3/market/instruments', { category, symbol });
+    const ins = (Array.isArray(d) ? d : (d && d.list) || [])[0] || {};
+    pp = +(ins.pricePrecision ?? ins.pricePlace ?? pp); vp = +(ins.quantityPrecision ?? ins.volumePlace ?? vp); min = +(ins.minOrderQty ?? ins.minTradeNum ?? 0);
+  } catch (e) { console.warn('instrumentos UTA:', e.message); }
+  const qty = round(+o.size, vp);
+  if (!(qty > 0) || qty < min) throw new Error(`Quantidade ${qty} abaixo do mínimo ${min}`);
+  if (qty * price / lev > available) throw new Error(`Margem insuficiente: precisa ${(qty * price / lev).toFixed(2)}, disponível ${available.toFixed(2)}`);
+  try { await bg(mode, 'POST', '/api/v3/account/set-leverage', null, { category, symbol, leverage: String(lev), coin: 'USDT' }); } catch (e) { console.warn('alavancagem UTA:', e.message); }
+  const body = { category, symbol, qty: String(qty), price: String(roundP(price, pp)), side, orderType: 'limit', timeInForce: 'gtc',
+    takeProfit: String(roundP(tp, pp)), stopLoss: String(roundP(sl, pp)), tpTriggerBy: 'market', slTriggerBy: 'mark', clientOid: 'smc' + Date.now() };
+  const r = await bg(mode, 'POST', '/api/v3/trade/place-order', null, body);
+  console.log(new Date().toISOString(), 'UTA', mode.toUpperCase(), side, qty, symbol, '@', body.price, 'SL', body.stopLoss, 'TP', body.takeProfit, '->', r && r.orderId);
+  return { orderId: (r && (r.orderId || r.clientOid)) || '?', size: qty, symbol };
 }
 
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
