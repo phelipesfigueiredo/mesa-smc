@@ -96,6 +96,14 @@ async function placeOrder(o) {
   if (st0.account === 'uta') return placeUta(mode, o, side, price, sl, tp, lev, +st0.available);
 
   const [ct] = await pub('/api/v2/mix/market/contracts', { productType: m.productType, symbol: m.symbol });
+  // Uma operação por moeda: recusa se já houver acompanhamento, ordem pendente ou posição aberta neste par.
+  if (WATCH.some(w => w.mode === mode && w.symbol === m.symbol && w.state !== 'closed')) throw new Error(`Já existe uma operação em andamento em ${m.symbol}`);
+  try {
+    const pend = await bg(mode, 'GET', '/api/v2/mix/order/orders-pending', { productType: m.productType, symbol: m.symbol });
+    if ((pend?.entrustedList || []).length) throw new Error(`Já existe ordem aberta em ${m.symbol}`);
+    const pos = await bg(mode, 'GET', '/api/v2/mix/position/single-position', { symbol: m.symbol, productType: m.productType, marginCoin: m.marginCoin });
+    if ((pos || []).some(p => +(p.total || 0) > 0)) throw new Error(`Já existe posição aberta em ${m.symbol}`);
+  } catch (e) { if (/^Já existe/.test(e.message)) throw e; console.warn('checagem de ordens abertas:', e.message); }
   if (!ct) throw new Error('Contrato não encontrado: ' + m.symbol);
   const pp = +ct.pricePlace, vp = +ct.volumePlace, min = +ct.minTradeNum;
   const size = round(+o.size, vp); if (!(size >= min)) throw new Error(`Quantidade ${size} abaixo do mínimo ${min}`);

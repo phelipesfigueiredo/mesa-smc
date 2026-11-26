@@ -263,6 +263,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 :root[data-theme="dark"] .albtn[aria-pressed="true"]{background:#f5f5f3;color:#111113}
 .alstat{font:400 .72rem var(--mono);color:var(--muted)}
 @media(max-width:700px){.alertbox{margin-left:0}}
+.lockline{font:400 .76rem/1.45 var(--body);color:#c7c7cc;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
 </style>
 </head>
 <body>
@@ -600,7 +601,7 @@ function engine(c,Hc,Mc,ctx={}){
   const Lp=plan(1),Sp=plan(-1);
   const rank=p=>p.score-(p.vetos.length?3:0);
   const best=rank(Lp)>rank(Sp)||(rank(Lp)===rank(Sp)&&htf.emaDir>=0)?Lp:Sp;
-  return{px,a,R:R[n-1],E21,E200,VW,relV,cvd,st,zones,liq,htf,mtf,vp,best,L:Lp,S:Sp,eqm,rh,rl,session,hot:!!ctx.hot};
+  return{lastH:c[n-1].h,lastL:c[n-1].l,px,a,R:R[n-1],E21,E200,VW,relV,cvd,st,zones,liq,htf,mtf,vp,best,L:Lp,S:Sp,eqm,rh,rl,session,hot:!!ctx.hot};
 }
 function htfBias(h){const t=trendState(h);return{b:t.trend===t.emaDir?t.trend:0,...t}}
 
@@ -609,9 +610,43 @@ function analyzeCore(){
   if(C.length<210||H.length<60)return;
   const cfg=CFG[$('tf').value];
   const hot=(news||[]).some(x=>/FOMC|CPI|Fed |payroll|rate decision|SEC /i.test(x.title)&&(Date.now()/1000-x.published_on)<6*3600);
-  const x=engine(C,H,M,{deriv,hot,htf:cfg.htf,mtf:cfg.mtf});
+  const x=applyLock($('sym').value.trim().toUpperCase(),$('tf').value,engine(C,H,M,{deriv,hot,htf:cfg.htf,mtf:cfg.mtf}));
   if(typeof alMaybe==='function')alMaybe($('sym').value.trim().toUpperCase(),x);
   x.session=x.session;render(x);
+}
+
+/* ---------- travamento do plano ---------- */
+// Quando um sinal fica operável, entrada/stop/alvos congelam até o plano ser invalidado:
+// stop atingido, preço foi ao alvo 1 sem pegar a entrada, alvo final atingido, ordem expirou ou sinal operável no lado oposto.
+let LOCKS={};try{LOCKS=JSON.parse(localStorage.getItem('smc_locks')||'{}')}catch{}
+const saveLocks=()=>{try{localStorage.setItem('smc_locks',JSON.stringify(LOCKS))}catch{}};
+function sigState(r){const b=r.best;if(b.locked)return{active:true,now:b.inZone,b};const mult=b.score>=8?1:b.score>=6?.5:0;const active=mult>0&&b.rr>=2&&!b.vetos.length;return{active,now:active&&b.inZone,b}}
+function applyLock(sym,tf,x){
+  const k=sym+'|'+tf,cfg=CFG[tf];let L=LOCKS[k];x.lockEnded=null;
+  if(L){
+    const d=L.dir,hi=x.lastH,lo=x.lastL;let why=null;
+    if(!L.filled&&(d===1?lo<=L.entry:hi>=L.entry))L.filled=true;
+    if(d===1?lo<=L.stop:hi>=L.stop)why='stop atingido';
+    else if(!L.filled&&(d===1?hi>=L.tps[0].p:lo<=L.tps[0].p))why='o preço foi ao alvo 1 sem pegar a entrada';
+    else if(L.filled&&(d===1?hi>=L.tps.at(-1).p:lo<=L.tps.at(-1).p))why='alvo final atingido';
+    else if(!L.filled&&Date.now()>L.exp)why='a ordem expirou sem ser preenchida';
+    else{const o=d===1?x.S:x.L,om=o.score>=8?1:o.score>=6?.5:0;if(om>0&&o.rr>=2&&!o.vetos.length)why='surgiu sinal no lado oposto'}
+    if(why){x.lockEnded={...L,why};LOCKS[k+'|last']={dir:L.dir,end:Date.now()};delete LOCKS[k];L=null}
+    saveLocks();
+  }
+  const nb=x.best,stopViolated=nb.dir===1?x.lastL<=nb.stop:x.lastH>=nb.stop;
+  if(!L&&!x.lockEnded&&!stopViolated&&sigState(x).active){
+    const b=x.best,prev=LOCKS[k+'|last'];
+    L={id:Date.now().toString(36),dir:b.dir,entry:b.entry,stop:b.stop,tps:b.tps,main:b.main,rr:b.rr,z:b.z,score:b.score,at:Date.now(),exp:Date.now()+cfg.valid*tfSec(cfg.ltf)*1000,filled:false,
+       replaces:prev&&prev.dir===b.dir&&Date.now()-prev.end<60*60e3};
+    LOCKS[k]=L;saveLocks();
+  }
+  if(L){
+    const live=x.best,a=x.a,px=x.px;
+    const inZone=L.dir===1?px<=Math.max(L.z.top,L.entry)+a*0.1&&px>=Math.min(L.z.bot,L.entry)-a*0.1:px>=Math.min(L.z.bot,L.entry)-a*0.1&&px<=Math.max(L.z.top,L.entry)+a*0.1;
+    x.best={...live,dir:L.dir,entry:L.entry,stop:L.stop,tps:L.tps,main:L.main,rr:L.rr,z:L.z,score:L.score,vetos:[],inZone,locked:L,live:{score:live.score,vetos:live.vetos,dir:live.dir}};
+  }
+  return x;
 }
 
 /* ---------- validação histórica (backtest) ---------- */
@@ -687,10 +722,10 @@ function render(x){
   const side=b.dir===1?'COMPRA':'VENDA';
   let cls,head,sub;
   const act=b.dir===1?'comprar':'vender',dist=(b.entry/px-1)*100;
-  if(mult===0||b.rr<2||b.vetos.length){cls='v-wait';head='ESPERAR';sub=b.rr<2&&mult>0?`R:R líquido ${fmt(b.rr,2)} abaixo de 1:2.`:`Confluência ${b.score}/10 é insuficiente. Abaixo está o cenário de ${side.toLowerCase()} que ativaria o trade.`}
+  if(!b.locked&&(mult===0||b.rr<2||b.vetos.length)){cls='v-wait';head='ESPERAR';sub=b.rr<2&&mult>0?`R:R líquido ${fmt(b.rr,2)} abaixo de 1:2.`:`Confluência ${b.score}/10 é insuficiente. Abaixo está o cenário de ${side.toLowerCase()} que ativaria o trade.`}
   else if(b.inZone){cls=b.dir===1?'v-buy':'v-sell';head=b.dir===1?'COMPRAR AGORA':'VENDER AGORA';sub=`Preço dentro da zona. Setup ${b.score>=8?'A':'B (meia mão)'} · ${b.score}/10`}
   else{cls=b.dir===1?'v-buy':'v-sell';head=b.dir===1?'AGUARDAR PARA COMPRAR':'AGUARDAR PARA VENDER';sub=`Ordem em ${fmt(b.entry)}, aguardando o preço voltar à zona · ${b.score}/10${b.score<8?' · meia mão':''}`}
-  window.__planPrev=window.PLAN;window.PLAN={sym:$('sym').value.trim().toUpperCase(),dir:b.dir,entry:b.entry,stop:b.stop,tp:b.tps[0]?.p,tps:b.tps.map(t=>t.p),size:pos/b.entry,usd:pos,risk:riskUsd,score:b.score,active:cls!=='v-wait',inZone:b.inZone,head};if(typeof amtMode!=='undefined'&&amtMode==='risk')setRiskAmount();bgPreview();
+  window.__planPrev=window.PLAN;window.PLAN={lockId:b.locked?.id||null,sym:$('sym').value.trim().toUpperCase(),dir:b.dir,entry:b.entry,stop:b.stop,tp:b.tps[0]?.p,tps:b.tps.map(t=>t.p),size:pos/b.entry,usd:pos,risk:riskUsd,score:b.score,active:cls!=='v-wait',inZone:b.inZone,head};if(typeof amtMode!=='undefined'&&amtMode==='risk')setRiskAmount();bgPreview();
   const v=$('verdict');v.className='verdict '+cls;
   const tp1=b.tps[0]?.p,dir=b.dir===1?'sobe':'cai';
   const dtxt=`${dist>0?'+':''}${fmt(dist,2)}% do preço atual`;
@@ -713,6 +748,7 @@ function render(x){
    <div><small>Alvo 1</small><b class="ok">${fmt(b.tps[0]?.p)}</b><span>R:R ${fmt(b.rr,1)}</span></div>
   </div>
   ${rail}
+  ${b.locked?`<div class="lockline">🔒 Plano travado às ${new Date(b.locked.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${b.locked.filled?' · entrada já tocada':` · válido até ${new Date(b.locked.exp).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`}. Os valores não mudam até o plano ser encerrado (stop, alvo, expiração ou sinal oposto). Nota agora: ${b.live.score}/10${b.live.vetos.length?' · atenção: '+esc(b.live.vetos[0]):''}.</div>`:x.lockEnded?`<div class="lockline">Plano anterior encerrado: ${esc(x.lockEnded.why)}.</div>`:''}
   ${BT&&BT.sym===$('sym').value.trim().toUpperCase()&&BT.tf===$('tf').value?`<div class="btline">Histórico destas regras aqui: <b>${BT.n}</b> trades · acerto ${fmt(BT.wr*100,0)}% · expectativa <b class="${BT.exp>0?'ok':'bad'}">${BT.exp>0?'+':''}${fmt(BT.exp,2)}R</b>${BT.n<30?' · amostra pequena':''}</div>`:''}
   <details class="planmore"><summary>Plano completo</summary>
   <dl class="plan">
@@ -851,7 +887,7 @@ async function bgTest(){
 }
 async function bgSend(auto){
   const P=window.PLAN;if(!P||!P.active)return;
-  const key=P.sym+P.dir+P.entry.toPrecision(6),today=new Date().toISOString().slice(0,10);
+  const key=P.lockId?P.sym+'|'+P.lockId:P.sym+P.dir+P.entry.toPrecision(6),today=new Date().toISOString().slice(0,10);
   if(BG.sent[key])return;
   const cnt=Object.values(BG.sent).filter(d=>d===today).length;if(cnt>=+$('bgmax').value){if(!auto)bglog('Limite diário de ordens atingido');return}
   BG.sent[key]=today;
@@ -945,25 +981,27 @@ async function notify(title,body,sym,strong){
 let flashT=null;
 function flashTitle(t){if(!document.hidden)return;clearInterval(flashT);const orig=document.title;let k=0;flashT=setInterval(()=>{document.title=k++%2?orig:'🔔 '+t;if(!document.hidden||k>40){clearInterval(flashT);document.title=orig}},1000)}
 function openSym(sym){if(!sym)return;$('sym').value=sym;if(typeof markChip==='function')markChip();start()}
-function sigState(r){const b=r.best;const mult=b.score>=8?1:b.score>=6?.5:0;const active=mult>0&&b.rr>=2&&!b.vetos.length;return{active,now:active&&b.inZone,b}}
 function alMaybe(sym,r){
   if(!AL.on)return;
-  const s=sigState(r);const prev=AL.last[sym];AL.last[sym]=s.active?(s.now?'now':'limit'):'wait';
-  if(!s.active)return;
-  const b=s.b,key=`${sym}|${$('tf').value}|${b.dir}|${b.entry.toPrecision(5)}|${s.now?'now':'limit'}`,ts=Date.now();
-  if(AL.sent[key]&&ts-AL.sent[key]<45*60e3)return;
-  if(prev===AL.last[sym]&&AL.sent[key])return;
-  AL.sent[key]=ts;try{const keep=Object.fromEntries(Object.entries(AL.sent).filter(([,t])=>ts-t<864e5));AL.sent=keep;localStorage.setItem('smc_alert_sent',JSON.stringify(keep))}catch{}
-  const act=b.dir===1?'COMPRAR':'VENDER',coin=sym.replace(/USDT$/,'');
-  const title=s.now?`${act} AGORA · ${coin}`:`Sinal de ${b.dir===1?'compra':'venda'} · ${coin}`;
-  const body=`Nota ${b.score}/10${b.score>=8?' (setup A)':' (setup B, meia mão)'} · Entrada ${fmt(b.entry)} · Stop ${fmt(b.stop)} · Alvo ${fmt(b.tps[0]?.p)} · R:R ${fmt(b.rr,1)}${s.now?'':'\nOrdem limitada: espere o preço vir até a entrada.'}`;
-  notify(title,body,sym,s.now);
+  const coin=sym.replace(/USDT$/,''),tf=$('tf').value,ts=Date.now();
+  const mark=key=>{if(AL.sent[key])return false;AL.sent[key]=ts;try{AL.sent=Object.fromEntries(Object.entries(AL.sent).filter(([,t])=>ts-t<3*864e5));localStorage.setItem('smc_alert_sent',JSON.stringify(AL.sent))}catch{}return true};
+  if(r.lockEnded&&mark(`${sym}|${tf}|${r.lockEnded.id}|end`))notify(`Plano encerrado · ${coin}`,`O plano de ${r.lockEnded.dir===1?'compra':'venda'} em ${fmt(r.lockEnded.entry)} acabou: ${r.lockEnded.why}.`,sym,false);
+  const s=sigState(r);if(!s.active||!s.b.locked)return;
+  const b=s.b,L=b.locked,act=b.dir===1?'COMPRAR':'VENDER';
+  const vals=`Entrada ${fmt(b.entry)} · Stop ${fmt(b.stop)} · Alvo ${fmt(b.tps[0]?.p)} · R:R ${fmt(b.rr,1)}`;
+  const grade=`Nota ${L.score}/10${L.score>=8?' (setup A)':' (setup B, meia mão)'}`;
+  if(mark(`${sym}|${tf}|${L.id}|new`)){
+    const title=L.replaces?`Plano atualizado · ${coin}`:s.now?`${act} AGORA · ${coin}`:`Sinal de ${b.dir===1?'compra':'venda'} · ${coin}`;
+    notify(title,`${grade} · ${vals}${s.now?'':'\nOrdem limitada: espere o preço vir até a entrada.'}`,sym,s.now&&!L.replaces);
+  }else if(s.now&&mark(`${sym}|${tf}|${L.id}|zone`)){
+    notify(`${act} AGORA · ${coin}`,`O preço chegou na zona do plano travado. ${grade} · ${vals}`,sym,true);
+  }
 }
 async function alScanOnce(){
   if(!AL.on)return;const cfg=CFG[$('tf').value],cur=$('sym').value.trim().toUpperCase();
   for(const c of COINS){const sym=c+'USDT';if(sym===cur)continue;
     try{const [l,hh,mm]=await Promise.all([kl(sym,cfg.ltf,500),kl(sym,cfg.htf,300),kl(sym,cfg.mtf,300)]);
-      alMaybe(sym,engine(l,hh,mm,{htf:cfg.htf,mtf:cfg.mtf}))}catch{}
+      alMaybe(sym,applyLock(sym,$('tf').value,engine(l,hh,mm,{htf:cfg.htf,mtf:cfg.mtf})))}catch{}
     await new Promise(r=>setTimeout(r,400));
   }
 }
