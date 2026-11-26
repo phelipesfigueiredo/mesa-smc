@@ -399,6 +399,34 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 :root[data-theme="dark"] .panel::after{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.015) 30%,rgba(255,255,255,0) 65%,rgba(255,255,255,.06));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray,:root:not([data-theme="light"]) .panel.ink{position:relative;isolation:isolate}
 :root:not([data-theme="light"]) .panel::after{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.015) 30%,rgba(255,255,255,0) 65%,rgba(255,255,255,.06));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}}
+
+/* ---------- noturno: preto total ---------- */
+:root[data-theme="dark"] body{background:#000!important}
+:root[data-theme="dark"] body::after{display:none!important}
+:root[data-theme="dark"] .panel,:root[data-theme="dark"] .panel.gray,:root[data-theme="dark"] .panel.ink,:root[data-theme="dark"] .verdict,:root[data-theme="dark"] .mycard,:root[data-theme="dark"] .reader,:root[data-theme="dark"] .toast,:root[data-theme="dark"] .alhist,:root[data-theme="dark"] .fxbar,:root[data-theme="dark"] .chip:not([aria-pressed="true"]),:root[data-theme="dark"] .almin,:root[data-theme="dark"] .albtn:not([aria-pressed="true"]),:root[data-theme="dark"] .money,:root[data-theme="dark"] .bg select,:root[data-theme="dark"] .bg input{background:#000!important;box-shadow:none!important}
+:root[data-theme="dark"] .panel,:root[data-theme="dark"] .panel.gray,:root[data-theme="dark"] .panel.ink,:root[data-theme="dark"] .verdict{border:1px solid rgba(255,255,255,.12)!important}
+:root[data-theme="dark"] .panel::after{opacity:.6}
+:root[data-theme="dark"] .keynums div,:root[data-theme="dark"] .mygrid div,:root[data-theme="dark"] .obox,:root[data-theme="dark"] .pos,:root[data-theme="dark"] .mover,:root[data-theme="dark"] .summary,:root[data-theme="dark"] .lockline,:root[data-theme="dark"] .btline,:root[data-theme="dark"] .tw,:root[data-theme="dark"] .zero,:root[data-theme="dark"] .alitem,:root[data-theme="dark"] .vetos,:root[data-theme="dark"] .confirm,:root[data-theme="dark"] .warn,:root[data-theme="dark"] .seg2,:root[data-theme="dark"] .quick button,:root[data-theme="dark"] .bg button,:root[data-theme="dark"] .bg .mini,:root[data-theme="dark"] .chg,:root[data-theme="dark"] .score,:root[data-theme="dark"] .tag,:root[data-theme="dark"] .pill2,:root[data-theme="dark"] .rdseg,:root[data-theme="dark"] .tvtf button[aria-pressed="true"],:root[data-theme="dark"] .mini{background:#000!important;border:1px solid rgba(255,255,255,.1)!important;box-shadow:none!important}
+:root[data-theme="dark"] .seg2 button[aria-pressed="true"],:root[data-theme="dark"] .bg button.primary{background:#f5f5f7!important;color:#000!important}
+:root[data-theme="dark"] #acLive[aria-pressed="true"]{background:#ff453a!important;color:#fff!important}
+:root[data-theme="dark"] .v-buy{border-color:rgba(48,209,88,.45)!important}.v-sell{border-color:rgba(255,69,58,.45)!important}
+:root[data-theme="dark"] .verdict::after{opacity:.5}
+:root[data-theme="dark"] .bar{background:#141414!important}
+:root[data-theme="dark"] .warn{color:#ffd60a!important}.warn.bad,.vetos{color:#ff6b61!important}
+@media (prefers-color-scheme: dark){
+:root:not([data-theme="light"]) body{background:#000!important}
+:root:not([data-theme="light"]) body::after{display:none!important}
+:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray,:root:not([data-theme="light"]) .panel.ink,:root:not([data-theme="light"]) .verdict,:root:not([data-theme="light"]) .mycard,:root:not([data-theme="light"]) .reader,:root:not([data-theme="light"]) .toast,:root:not([data-theme="light"]) .alhist,:root:not([data-theme="light"]) .fxbar,:root:not([data-theme="light"]) .chip:not([aria-pressed="true"]),:root:not([data-theme="light"]) .almin,:root:not([data-theme="light"]) .albtn:not([aria-pressed="true"]),:root:not([data-theme="light"]) .money,:root:not([data-theme="light"]) .bg select,:root:not([data-theme="light"]) .bg input{background:#000!important;box-shadow:none!important}
+:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .panel.gray,:root:not([data-theme="light"]) .panel.ink,:root:not([data-theme="light"]) .verdict{border:1px solid rgba(255,255,255,.12)!important}
+:root:not([data-theme="light"]) .panel::after{opacity:.6}
+:root:not([data-theme="light"]) .keynums div,:root:not([data-theme="light"]) .mygrid div,:root:not([data-theme="light"]) .obox,:root:not([data-theme="light"]) .pos,:root:not([data-theme="light"]) .mover,:root:not([data-theme="light"]) .summary,:root:not([data-theme="light"]) .lockline,:root:not([data-theme="light"]) .btline,:root:not([data-theme="light"]) .tw,:root:not([data-theme="light"]) .zero,:root:not([data-theme="light"]) .alitem,:root:not([data-theme="light"]) .vetos,:root:not([data-theme="light"]) .confirm,:root:not([data-theme="light"]) .warn,:root:not([data-theme="light"]) .seg2,:root:not([data-theme="light"]) .quick button,:root:not([data-theme="light"]) .bg button,:root:not([data-theme="light"]) .bg .mini,:root:not([data-theme="light"]) .chg,:root:not([data-theme="light"]) .score,:root:not([data-theme="light"]) .tag,:root:not([data-theme="light"]) .pill2,:root:not([data-theme="light"]) .rdseg,:root:not([data-theme="light"]) .tvtf button[aria-pressed="true"],:root:not([data-theme="light"]) .mini{background:#000!important;border:1px solid rgba(255,255,255,.1)!important;box-shadow:none!important}
+:root:not([data-theme="light"]) .seg2 button[aria-pressed="true"],:root:not([data-theme="light"]) .bg button.primary{background:#f5f5f7!important;color:#000!important}
+:root:not([data-theme="light"]) #acLive[aria-pressed="true"]{background:#ff453a!important;color:#fff!important}
+:root:not([data-theme="light"]) .v-buy{border-color:rgba(48,209,88,.45)!important}.v-sell{border-color:rgba(255,69,58,.45)!important}
+:root:not([data-theme="light"]) .verdict::after{opacity:.5}
+:root:not([data-theme="light"]) .bar{background:#141414!important}
+:root:not([data-theme="light"]) .warn{color:#ffd60a!important}.warn.bad,.vetos{color:#ff6b61!important}
+}
 </style>
 </head>
 <body>
@@ -591,7 +619,7 @@ let TH={};
 function isDark(){const t=document.documentElement.dataset.theme;return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
 function applyTheme(){
   const d=isDark();$('theme').textContent=d?'☀':'☾';
-  TH=d?{up:'#f5f5f7',dn:'#5a5a5e',vu:'rgba(245,245,247,.22)',vd:'rgba(99,99,102,.35)',txt:'#8e8e93',grid:'rgba(255,255,255,.05)',e21:'#f5f5f7',e200:'#636366',vw:'#8e8e93',lab:'#2c2c2e'}
+  TH=d?{up:'#f5f5f7',dn:'#5a5a5e',vu:'rgba(245,245,247,.22)',vd:'rgba(99,99,102,.35)',txt:'#8e8e93',grid:'rgba(255,255,255,.035)',e21:'#f5f5f7',e200:'#636366',vw:'#8e8e93',lab:'#2c2c2e'}
         :{up:'#1d1d1f',dn:'#b4b4b9',vu:'rgba(29,29,31,.2)',vd:'rgba(161,161,166,.3)',txt:'#86868b',grid:'rgba(0,0,0,.045)',e21:'#1d1d1f',e200:'#c7c7cc',vw:'#8e8e93',lab:'#1d1d1f'};
   chart.applyOptions({layout:{textColor:TH.txt},grid:{vertLines:{color:TH.grid},horzLines:{color:TH.grid}},crosshair:{vertLine:{labelBackgroundColor:TH.lab},horzLine:{labelBackgroundColor:TH.lab}}});
   cs.applyOptions({upColor:TH.up,downColor:TH.dn,wickUpColor:TH.up,wickDownColor:TH.dn});
