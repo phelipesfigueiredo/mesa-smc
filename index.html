@@ -326,10 +326,40 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .toast .tx:hover{color:#f5f5f3}
 .boxlayer{position:absolute;inset:0;pointer-events:none;z-index:3}
 #chart{position:relative}
+.reader{width:min(760px,94vw);max-height:88vh;padding:0;border:0;border-radius:22px;background:var(--panel-solid,#fff);color:var(--fg);box-shadow:0 40px 100px -30px rgba(0,0,0,.6);overflow:hidden;display:none}
+.reader[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+:root[data-theme="dark"] .reader{background:#141416}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .reader{background:#141416}}
+.reader::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(3px)}
+.rdbar{display:flex;align-items:center;gap:10px;padding:12px 14px 12px 22px;border-bottom:1px solid var(--line)}
+.rdsrc{font:500 .74rem var(--mono);color:var(--muted);margin-right:auto}
+.rdseg{background:var(--panel2)}.rdseg button{color:var(--muted)}.rdseg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.rdseg button:disabled{opacity:.35;cursor:not-allowed}
+.rdx{background:none;border:0;color:var(--muted);font:400 1.6rem/1 var(--body);padding:0 6px;cursor:pointer}
+.rdbody{overflow:auto;padding:20px 26px 10px;font:400 1rem/1.65 var(--body);overscroll-behavior:contain}
+.rdbody h3{font:700 1.45rem/1.25 var(--display);letter-spacing:-.02em;margin:0 0 10px;text-wrap:balance}
+.rdbody h4{font:600 1.05rem var(--display);margin:18px 0 6px}
+.rdbody p{margin:0 0 12px;max-width:68ch}.rdlead{font-size:1.06rem;color:var(--muted)}
+.rdli{padding-left:6px}
+.rdimg{width:100%;max-height:300px;object-fit:cover;border-radius:14px;margin-bottom:16px;background:var(--panel2)}
+.rdfoot{display:flex;justify-content:space-between;gap:10px;padding:12px 22px;border-top:1px solid var(--line);font-size:.8rem}
+.rdfoot a{color:var(--fg);font-weight:600}
+.rdload{display:flex;gap:6px;padding:20px 0}.rdload i{width:8px;height:8px;border-radius:50%;background:var(--muted);animation:rdl 1s infinite alternate}
+.rdload i:nth-child(2){animation-delay:.2s}.rdload i:nth-child(3){animation-delay:.4s}
+@keyframes rdl{to{opacity:.2;transform:translateY(-4px)}}
+.mover,[data-read]{cursor:pointer}
+.mover:hover{background:rgba(255,255,255,.09)}
 </style>
 </head>
 <body>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<dialog class="reader" id="reader" aria-labelledby="rdTitle">
+  <div class="rdbar"><span class="rdsrc" id="rdSrc"></span>
+    <div class="seg rdseg" role="group" aria-label="Idioma"><button type="button" id="rdOrig" aria-pressed="false">Original</button><button type="button" id="rdPt" aria-pressed="true">Português</button></div>
+    <button type="button" class="rdx" id="rdClose" aria-label="Fechar">×</button></div>
+  <div class="rdbody" id="rdBody"></div>
+  <div class="rdfoot"><a id="rdLink" href="#" target="_blank" rel="noopener">Abrir no site original ↗</a><span class="mu" id="rdNote"></span></div>
+</dialog>
 <div class="wrap">
 <header>
   <a class="brand" href="/" aria-label="Mesa SMC"><img src="/icons/logo.svg" alt="" width="38" height="38"><h1><b>MESA SMC</b><span>Phelipe Figueiredo</span></h1></a>
@@ -458,7 +488,7 @@ const BOX={zones:[],eq:[],dirty:true,cv:null,ctx:null};
   new ResizeObserver(mark).observe(host);
   host.addEventListener('wheel',mark,{passive:true});host.addEventListener('pointermove',mark,{passive:true});
   const loop=()=>{if(BOX.dirty){BOX.dirty=false;drawBoxes()}requestAnimationFrame(loop)};requestAnimationFrame(loop);
-  setInterval(mark,400);
+  setInterval(()=>{if(!document.hidden)mark()},1500);
 })();
 function drawBoxes(){
   const cv=BOX.cv,host=$('chart'),dpr=window.devicePixelRatio||1,W=host.clientWidth,Hh=host.clientHeight;
@@ -955,14 +985,14 @@ function renderNews(){
   if(news===null){mv.innerHTML=location.protocol.startsWith('http')?'<div class="mu">Nenhuma fonte de notícias respondeu. Veja os avisos no Terminal do servidor.</div>':'<div class="mu">Não foi possível carregar as notícias. Abra o app por <b>http://localhost:8787</b> (rodando <b>node server.js</b>) para buscar notícias de CoinDesk, Cointelegraph, Decrypt, The Block, Livecoins e Portal do Bitcoin.</div>';el.innerHTML=''}
   else{const top=news.map(n=>({n,...scoreNews(n)})).filter(x=>x.s>=3&&(Date.now()/1000-x.n.published_on)<36*3600).sort((a,b)=>b.s-a.s).slice(0,5);
    mv.innerHTML=top.map(({n,s,why,dir})=>{const ago=Math.round((Date.now()/1000-n.published_on)/60);const url=/^https:\/\//.test(n.url)?n.url:'#';
-    return`<div class="mover"><span class="lvl ${s>=6?'hi':'md'}">${s>=6?'ALTO':'MÉDIO'}</span><div><a href="${esc(url)}" target="_blank" rel="noopener">${esc(n.title)}</a>
+    return`<div class="mover" data-read="${esc(url)}" data-lang="${esc(n.lang||'en')}" data-src="${esc(n.source_info?.name||n.source)}" data-t="${n.published_on}"><span class="lvl ${s>=6?'hi':'md'}">${s>=6?'ALTO':'MÉDIO'}</span><div><a href="${esc(url)}" target="_blank" rel="noopener">${esc(n.title)}</a>
     <div class="note">${esc(why.join(' · '))}${dir?`<span class="dir ${dir>0?'ok':'bad'}">${dir>0?'▲ viés de alta':'▼ viés de baixa'}</span>`:''} · ${esc(n.source_info?.name||n.source)} · há ${ago<60?ago+' min':Math.round(ago/60)+' h'}</div></div></div>`}).join('')||'<div class="mu">Nenhuma notícia de alto impacto nas últimas 36 h.</div>'}
   if(news===null)return;
   const bull=/surge|rally|approv|inflow|record|bull|soar|adopt|buy/i,bear=/hack|exploit|ban|outflow|lawsuit|crash|plunge|bear|liquidat|sell-off|dump/i,macro=/FOMC|CPI|Fed|payroll|inflation|rate|juros|infla[çc]|Copom|Selic/i;
   el.innerHTML=news.map(n=>{const ago=Math.round((Date.now()/1000-n.published_on)/60);
     const t=[macro.test(n.title)?'<span class="tag mid">MACRO</span>':'',bull.test(n.title)?'<span class="tag ok">+</span>':'',bear.test(n.title)?'<span class="tag bad">−</span>':''].join('');
     const url=/^https:\/\//.test(n.url)?n.url:'#';
-    return`<li>${t}<a href="${esc(url)}" target="_blank" rel="noopener">${esc(n.title)}</a><div class="note">${esc(n.source_info?.name||n.source)}${n.lang==='pt'?' · 🇧🇷':''} · há ${ago<60?ago+' min':Math.round(ago/60)+' h'}</div></li>`}).join('')||'<li class="mu">Sem notícias.</li>';
+    return`<li data-read="${esc(url)}" data-lang="${esc(n.lang||'en')}" data-src="${esc(n.source_info?.name||n.source)}" data-t="${n.published_on}">${t}<a href="${esc(url)}" target="_blank" rel="noopener">${esc(n.title)}</a><div class="note">${esc(n.source_info?.name||n.source)}${n.lang==='pt'?' · 🇧🇷':''} · há ${ago<60?ago+' min':Math.round(ago/60)+' h'}</div></li>`}).join('')||'<li class="mu">Sem notícias.</li>';
 }
 
 /* ---------- Bitget ---------- */
@@ -1238,6 +1268,44 @@ $('mSimple').onclick=()=>setMode('simple');$('mAdv').onclick=()=>setMode('adv');
 let m0='simple';try{m0=localStorage.getItem('smc_mode')||'simple'}catch{}
 document.body.classList.toggle('simple',m0==='simple');$('mSimple').setAttribute('aria-pressed',m0==='simple');$('mAdv').setAttribute('aria-pressed',m0!=='simple');
 $('btrun').onclick=runBacktest;
+/* ---------- leitor de notícias com tradução ---------- */
+const RD={cur:null,orig:null,pt:null,lang:'pt',seq:0};
+const apiBase=location.protocol.startsWith('http')?'':null;
+function rdPaint(){
+  const d=RD.lang==='pt'&&RD.pt?RD.pt:RD.orig;if(!d)return;
+  $('rdOrig').setAttribute('aria-pressed',RD.lang!=='pt');$('rdPt').setAttribute('aria-pressed',RD.lang==='pt');
+  $('rdBody').innerHTML=`${d.image?`<img class="rdimg" src="${esc(d.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`:''}
+    <h3 id="rdTitle">${esc(d.title)}</h3>${d.description?`<p class="rdlead">${esc(d.description)}</p>`:''}
+    ${d.body.length?d.body.map(p=>p.tag==='p'?`<p>${esc(p.text)}</p>`:p.tag==='li'?`<p class="rdli">• ${esc(p.text)}</p>`:`<h4>${esc(p.text)}</h4>`).join(''):'<p class="mu">Não consegui extrair o texto completo desta matéria. Use o link abaixo para ler no site.</p>'}`;
+  $('rdNote').textContent=RD.lang==='pt'&&RD.pt&&RD.orig.needsTr?'Tradução automática':'';
+}
+async function rdTranslate(){
+  if(RD.pt||!RD.orig||!RD.orig.needsTr)return rdPaint();
+  const my=RD.seq;$('rdNote').textContent='Traduzindo…';
+  const o=RD.orig,texts=[o.title,o.description||'',...o.body.map(p=>p.text)];
+  try{const r=await fetch('/api/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts})});const j=await r.json();if(!r.ok)throw new Error(j.error);
+    if(my!==RD.seq)return;const t=j.texts;RD.pt={...o,title:t[0],description:t[1],body:o.body.map((p,i)=>({tag:p.tag,text:t[i+2]||p.text}))};rdPaint();
+  }catch(e){if(my===RD.seq){$('rdNote').textContent='Não consegui traduzir agora.';RD.lang='orig';rdPaint()}}
+}
+async function openReader(url,meta){
+  const my=++RD.seq;RD.orig=RD.pt=null;RD.lang='pt';
+  $('rdSrc').textContent=`${meta.src||''}${meta.t?' · '+new Date(meta.t*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}`;
+  $('rdLink').href=url;$('rdBody').innerHTML=`<h3 id="rdTitle">${esc(meta.title||'')}</h3><div class="rdload"><i></i><i></i><i></i></div>`;$('rdNote').textContent='';
+  const dlg=$('reader');if(!dlg.open)dlg.showModal();
+  if(apiBase===null){$('rdBody').insertAdjacentHTML('beforeend','<p class="mu">O leitor funciona no app local ou na versão online. Use o link abaixo.</p>');$('rdBody').querySelector('.rdload')?.remove();return}
+  try{const r=await fetch('/api/article?url='+encodeURIComponent(url));const d=await r.json();if(!r.ok)throw new Error(d.error);if(my!==RD.seq)return;
+    d.needsTr=!(/^pt/i.test(d.lang||'')||meta.lang==='pt');RD.orig=d;if(!d.needsTr){RD.lang='orig';$('rdPt').disabled=true}else $('rdPt').disabled=false;
+    rdPaint();if(RD.lang==='pt')rdTranslate();
+  }catch(e){if(my!==RD.seq)return;$('rdBody').innerHTML=`<h3 id="rdTitle">${esc(meta.title||'')}</h3><p class="mu">Não consegui carregar a matéria (${esc(e.message)}). Use o link abaixo para abrir no site.</p>`}
+}
+document.addEventListener('click',e=>{
+  const holder=e.target.closest('[data-read]');if(!holder||e.metaKey||e.ctrlKey)return;
+  const a=e.target.closest('a');if(!a&&!e.target.closest('.mover'))return;
+  e.preventDefault();openReader(holder.dataset.read,{src:holder.dataset.src,t:+holder.dataset.t,lang:holder.dataset.lang,title:(holder.querySelector('a')||holder).textContent.trim()});
+});
+$('rdClose').onclick=()=>$('reader').close();
+$('reader').addEventListener('click',e=>{if(e.target===$('reader'))$('reader').close()});
+$('rdOrig').onclick=()=>{RD.lang='orig';rdPaint()};$('rdPt').onclick=()=>{RD.lang='pt';rdTranslate();rdPaint()};
 /* recarrega sozinho quando o app local for atualizado (sem atrapalhar se você estiver digitando ou confirmando algo) */
 if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
   let ver=null;
