@@ -79,6 +79,70 @@ async function status(mode) {
   return { ok: true, mode, available: String(p.available), account: p.kind, tries: p.tries };
 }
 
+// ---------- Posições e ordens abertas (para fechar / cancelar pelo app) ----------
+async function ensureAcct(mode) { if (!ACCT[mode]) await status(mode); }
+async function openState(mode) {
+  await ensureAcct(mode);
+  const m = market(mode, 'BTCUSDT');
+  const pos = await bg(mode, 'GET', '/api/v2/mix/position/all-position', { productType: m.productType, marginCoin: m.marginCoin });
+  const positions = (pos || []).filter(p => +(p.total || 0) > 0).map(p => ({
+    symbol: p.symbol, holdSide: p.holdSide, total: +p.total, available: +(p.available ?? p.total), entry: +(p.openPriceAvg || p.averageOpenPrice || 0),
+    mark: +(p.markPrice || 0), pnl: +(p.unrealizedPL || 0), margin: +(p.marginSize || p.margin || 0), leverage: +(p.leverage || 0), liq: +(p.liquidationPrice || 0),
+  }));
+  let orders = [];
+  try {
+    const d = await bg(mode, 'GET', '/api/v2/mix/order/orders-pending', { productType: m.productType });
+    orders = (d?.entrustedList || []).map(o => ({ orderId: o.orderId, symbol: o.symbol, side: o.side, tradeSide: o.tradeSide, price: +o.price, size: +o.size,
+      tp: +(o.presetStopSurplusPrice || 0), sl: +(o.presetStopLossPrice || 0), created: +(o.cTime || 0) }));
+  } catch (e) { console.warn('ordens pendentes:', e.message); }
+  return { positions, orders, hedge: null };
+}
+async function closePosition(o) {
+  const mode = o.mode === 'live' ? 'live' : 'demo';
+  await ensureAcct(mode);
+  const pct = Math.round(+o.percent);
+  if (![25, 50, 75, 100].includes(pct) && !(pct > 0 && pct <= 100)) throw new Error('Porcentagem inválida');
+  const holdSide = o.holdSide === 'short' ? 'short' : 'long';
+  const base = market(mode, 'BTCUSDT'); const sym = String(o.symbol || '');
+  if (!/^[A-Z0-9]{2,30}$/.test(sym)) throw new Error('Par inválido');
+  const m = { ...base, symbol: sym };
+  const st = await openState(mode);
+  const p = st.positions.find(x => x.symbol === sym && x.holdSide === holdSide);
+  if (!p) throw new Error(`Não há posição ${holdSide} aberta em ${sym}`);
+  if (pct === 100) {
+    const r = await bg(mode, 'POST', '/api/v2/mix/order/close-positions', null, { symbol: sym, productType: m.productType, holdSide });
+    console.log(new Date().toISOString(), mode.toUpperCase(), 'FECHAR 100%', sym, holdSide, JSON.stringify(r));
+    return { closed: p.total, percent: 100 };
+  }
+  const [ct] = await pub('/api/v2/mix/market/contracts', { productType: m.productType, symbol: sym });
+  const vp = +(ct?.volumePlace ?? 3), min = +(ct?.minTradeNum ?? 0);
+  const size = round(p.available * pct / 100, vp);
+  if (!(size > 0) || size < min) throw new Error(`${pct}% dá ${size}, abaixo do mínimo de ${min}. Use uma porcentagem maior ou feche 100%.`);
+  const acct = await bg(mode, 'GET', '/api/v2/mix/account/account', { symbol: sym, productType: m.productType, marginCoin: m.marginCoin });
+  const hedge = acct?.posMode === 'hedge_mode';
+  // Modo hedge: lado = lado da posição + tradeSide "close". Modo único: lado oposto + reduceOnly.
+  const body = { symbol: sym, productType: m.productType, marginMode: acct?.marginMode || 'isolated', marginCoin: m.marginCoin, size: String(size), orderType: 'market', clientOid: 'smcclose' + Date.now() };
+  if (hedge) { body.side = holdSide === 'long' ? 'buy' : 'sell'; body.tradeSide = 'close'; }
+  else { body.side = holdSide === 'long' ? 'sell' : 'buy'; body.reduceOnly = 'YES'; }
+  const r = await bg(mode, 'POST', '/api/v2/mix/order/place-order', null, body);
+  console.log(new Date().toISOString(), mode.toUpperCase(), `FECHAR ${pct}%`, sym, holdSide, size, '->', r?.orderId);
+  // fechamento manual parcial não deve ser confundido com TP1 pelo acompanhamento
+  WATCH.filter(w => w.symbol === sym && w.state === 'managing' && w.mode === mode).forEach(w => { w.size = round(w.size - size, vp); wlog(w, `fechamento manual de ${size} (${pct}%)`); });
+  saveWatch();
+  return { closed: size, percent: pct, orderId: r?.orderId };
+}
+async function cancelOrder(o) {
+  const mode = o.mode === 'live' ? 'live' : 'demo';
+  await ensureAcct(mode);
+  const m = market(mode, 'BTCUSDT'); const sym = String(o.symbol || '');
+  if (!/^[A-Z0-9]{2,30}$/.test(sym) || !/^[0-9A-Za-z_-]{1,64}$/.test(String(o.orderId || ''))) throw new Error('Pedido inválido');
+  await bg(mode, 'POST', '/api/v2/mix/order/cancel-order', null, { symbol: sym, productType: m.productType, marginCoin: m.marginCoin, orderId: String(o.orderId) });
+  WATCH.filter(w => w.orderId === o.orderId).forEach(w => { w.state = 'closed'; wlog(w, 'ordem cancelada pelo app'); });
+  saveWatch();
+  console.log(new Date().toISOString(), mode.toUpperCase(), 'CANCELAR', sym, o.orderId);
+  return { canceled: o.orderId };
+}
+
 async function placeOrder(o) {
   const mode = o.mode === 'live' ? 'live' : 'demo';
   if (!/^[A-Z0-9]{2,20}USDT$/.test(o.symbol)) throw new Error('Par inválido');
@@ -234,6 +298,13 @@ if (require.main === module) http.createServer(async (req, res) => {
     if ((origin && origin !== `http://${host}`) || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(res, 403, { error: 'Origem não permitida' });
     try {
       if (url.pathname === '/api/news') { const n = await getNews(); return send(res, 200, { items: n.data, errors: n.errors, at: n.at }); }
+      if (url.pathname === '/api/bitget/open') return send(res, 200, await openState(url.searchParams.get('mode') === 'live' ? 'live' : 'demo'));
+      if ((url.pathname === '/api/bitget/close' || url.pathname === '/api/bitget/cancel') && req.method === 'POST') {
+        if (req.headers['content-type'] !== 'application/json') return send(res, 415, { error: 'JSON esperado' });
+        let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 1e4) throw new Error('Corpo grande demais'); }
+        const body = JSON.parse(raw);
+        return send(res, 200, url.pathname.endsWith('close') ? await closePosition(body) : await cancelOrder(body));
+      }
       if (url.pathname === '/api/bitget/watch') return send(res, 200, WATCH.map(w => ({ symbol: w.symbol, orderId: w.orderId, state: w.state, partials: w.partials, beDone: w.beDone, log: (w.log || []).slice(-5) })));
       if (url.pathname === '/api/bitget/debug') {
         const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo', out = {};

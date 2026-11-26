@@ -268,6 +268,20 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .localbtn:hover{background:rgba(255,255,255,.16)}
 .localbtn .dot{width:8px;height:8px;border-radius:50%;background:#8e8e93}
 .localbtn .dot.on{background:#34c759;box-shadow:0 0 0 3px rgba(52,199,89,.2)}.localbtn .dot.off{background:#ff9f0a}
+.openbox{display:grid;gap:8px;grid-template-columns:minmax(0,1fr)}
+.bg .mini{padding:5px 10px;border-radius:8px;font:600 .72rem var(--body);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:inherit;cursor:pointer}
+.bg .mini:hover{background:rgba(255,255,255,.16)}
+.bg .mini.dang{background:rgba(255,69,58,.16);border-color:rgba(255,69,58,.35);color:#ff6b61}
+.pos{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07)}
+.posh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.posh b{font:700 .95rem var(--display)}
+.pnl{margin-left:auto;font:600 .85rem var(--mono);font-variant-numeric:tabular-nums}.pnl small{font-weight:400;opacity:.8}
+.posm{display:flex;gap:10px;flex-wrap:wrap;font:400 .72rem var(--mono);color:#8e8e93}
+.closer,.confirm{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font:500 .74rem var(--body);color:#c7c7cc}
+.closer span{margin-right:auto}
+.confirm{padding:6px 8px;border-radius:9px;background:rgba(255,69,58,.1)}
+.confirm b{color:#ff6b61}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -341,6 +355,10 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <div class="btns"><button type="button" id="bgtest">Testar conexão</button><button type="button" class="primary" id="bgsend" disabled>Enviar ordem</button></div>
       <label class="switch">Modo automático<input type="checkbox" id="bgauto" disabled></label>
       <div class="note" id="bghint">Para conectar, rode o servidor local (server.js) e abra http://localhost:8787. Suas chaves ficam só no seu computador.</div>
+      <div class="openbox" id="bgopen" hidden>
+        <div class="stepH"><span>3 · Suas operações abertas</span><button type="button" class="mini" id="bgrefresh">Atualizar</button></div>
+        <div id="bgpos"></div>
+      </div>
       <div class="log" id="bglog"></div>
     </div>
   </div>
@@ -893,7 +911,7 @@ function setRiskAmount(){
 async function bgTest(){
   if(!onServer){$('bgconn').textContent='offline';return}
   try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;BG.avail=+j.available;if(amtMode==='risk')setRiskAmount();$('bgavail').textContent='saldo US$ '+fmt(BG.avail,2);$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
-    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));}
+    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);}
   catch(e){BG.ok=false;$('bgconn').textContent='erro';$('bgconn').className='pill2 bad';$('bghint').textContent='Falha: '+e.message;bglog('Erro: '+e.message)}
   bgPreview();
 }
@@ -904,10 +922,47 @@ async function bgSend(auto){
   const cnt=Object.values(BG.sent).filter(d=>d===today).length;if(cnt>=+$('bgmax').value){if(!auto)bglog('Limite diário de ordens atingido');return}
   BG.sent[key]=today;
   try{const j=await bgcall('order',{mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,tps:bgCalc().tps,shares:bgCalc().sh,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
-    bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId} · TP final ${j.finalTp||'-'}${j.partials?.length?' · parciais quando executar: '+j.partials.join(', '):''}`)}
+    bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId} · TP final ${j.finalTp||'-'}${j.partials?.length?' · parciais quando executar: '+j.partials.join(', '):''}`);setTimeout(bgOpenLoad,1200)}
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
-$('bgtest').onclick=bgTest;$('bgsend').onclick=()=>bgSend(false);
+$('bgtest').onclick=bgTest;
+/* ---------- posições abertas: fechar a mercado e cancelar ordens ---------- */
+const OPEN={busy:false,confirm:null,timer:null,data:null};
+async function bgOpenLoad(){
+  if(!BG.ok||OPEN.busy)return;
+  try{OPEN.data=await bgcall('open?mode='+$('bgmode').value);bgOpenRender()}catch(e){$('bgpos').innerHTML=`<div class="warn bad">Não consegui ler as posições: ${esc(e.message)}</div>`;$('bgopen').hidden=false}
+}
+function bgOpenRender(){
+  const d=OPEN.data;if(!d)return;$('bgopen').hidden=false;
+  const pos=d.positions.map(p=>{
+    const k=p.symbol+'|'+p.holdSide,roi=p.margin?p.pnl/p.margin*100:0,c=OPEN.confirm&&OPEN.confirm.k===k?OPEN.confirm.pct:null;
+    return`<div class="pos"><div class="posh"><b>${esc(p.symbol.replace(/USDT$/,''))}</b><span class="side ${p.holdSide==='long'?'l':'s'}">${p.holdSide==='long'?'LONG':'SHORT'}</span>${p.leverage?`<span class="mu">${p.leverage}x</span>`:''}
+      <span class="pnl ${p.pnl>=0?'ok':'bad'}">${p.pnl>=0?'+':''}US$ ${fmt(p.pnl,2)} <small>${roi>=0?'+':''}${fmt(roi,1)}%</small></span></div>
+      <div class="posm"><span>Qtd ${fmt(p.total,5)}</span><span>Entrada ${fmt(p.entry)}</span><span>Agora ${fmt(p.mark)}</span>${p.liq?`<span>Liq. ${fmt(p.liq)}</span>`:''}</div>
+      ${c?`<div class="confirm">Fechar <b>${c}%</b> a mercado agora?<button type="button" class="mini dang" data-do="close" data-k="${esc(k)}" data-p="${c}">Sim, fechar</button><button type="button" class="mini" data-do="nope">Não</button></div>`
+        :`<div class="closer"><span>Fechar a mercado</span>${[25,50,75,100].map(x=>`<button type="button" class="mini${x===100?' dang':''}" data-do="ask" data-k="${esc(k)}" data-p="${x}">${x}%</button>`).join('')}</div>`}
+    </div>`}).join('');
+  const ord=d.orders.map(o=>{const c=OPEN.confirm&&OPEN.confirm.k==='o'+o.orderId;
+    return`<div class="pos ord"><div class="posh"><b>${esc(o.symbol.replace(/USDT$/,''))}</b><span class="mu">ordem limitada ${o.side==='buy'?'de compra':'de venda'}</span><span class="pnl mu">${fmt(o.size,5)} @ ${fmt(o.price)}</span></div>
+      ${o.tp||o.sl?`<div class="posm">${o.sl?`<span>Stop ${fmt(o.sl)}</span>`:''}${o.tp?`<span>TP ${fmt(o.tp)}</span>`:''}</div>`:''}
+      ${c?`<div class="confirm">Cancelar esta ordem?<button type="button" class="mini dang" data-do="cancel" data-o="${esc(o.orderId)}" data-s="${esc(o.symbol)}">Sim, cancelar</button><button type="button" class="mini" data-do="nope">Não</button></div>`
+        :`<div class="closer"><button type="button" class="mini" data-do="askc" data-o="${esc(o.orderId)}">Cancelar ordem</button></div>`}</div>`}).join('');
+  $('bgpos').innerHTML=pos+ord||'<div class="mu" style="font-size:.82rem">Nenhuma posição ou ordem aberta.</div>';
+}
+$('bgpos').onclick=async e=>{
+  const t=e.target.closest('button');if(!t)return;const a=t.dataset.do;
+  if(a==='nope'){OPEN.confirm=null;return bgOpenRender()}
+  if(a==='ask'){OPEN.confirm={k:t.dataset.k,pct:+t.dataset.p};return bgOpenRender()}
+  if(a==='askc'){OPEN.confirm={k:'o'+t.dataset.o};return bgOpenRender()}
+  OPEN.busy=true;t.disabled=true;t.textContent='Enviando…';
+  try{
+    if(a==='close'){const [symbol,holdSide]=t.dataset.k.split('|');const r=await bgcall('close',{mode:$('bgmode').value,symbol,holdSide,percent:+t.dataset.p});bglog(`Fechado ${r.percent}% de ${symbol} ${holdSide.toUpperCase()} a mercado (${fmt(r.closed,5)})`)}
+    if(a==='cancel'){await bgcall('cancel',{mode:$('bgmode').value,symbol:t.dataset.s,orderId:t.dataset.o});bglog(`Ordem ${t.dataset.o} cancelada`)}
+  }catch(err){bglog('Recusado: '+err.message)}
+  OPEN.busy=false;OPEN.confirm=null;setTimeout(bgOpenLoad,800);
+};
+$('bgrefresh').onclick=bgOpenLoad;
+OPEN.timer=setInterval(()=>{if(!document.hidden)bgOpenLoad()},10000);$('bgsend').onclick=()=>bgSend(false);
 let amtMode='risk';
 const markQuick=()=>document.querySelectorAll('#bgquick button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===amtMode));
 $('bgquick').onclick=e=>{const p=e.target.dataset?.p;if(!p)return;amtMode=p;
