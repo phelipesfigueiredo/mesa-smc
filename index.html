@@ -385,6 +385,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <option value="8">Só setup A (nota 8+)</option>
       <option value="6">Setups A e B (nota 6+)</option>
     </select>
+    <button type="button" id="alTest" class="albtn ghost" title="Toca o som de compra e, em seguida, o de venda">Testar som</button>
     <button type="button" id="alHistBtn" class="albtn ghost" aria-expanded="false">Últimos alertas <b id="alCount">0</b></button>
     <span class="alstat" id="alStat"></span>
     <div class="alhist" id="alHist" hidden></div>
@@ -1202,6 +1203,10 @@ async function alToggle(){
   alUI();
 }
 let audioCtx=null;
+/* som do sinal (G2 · Presença): compra sobe, venda desce. Pré-carregado para tocar na hora. */
+const SND={buy:new Audio('/sounds/sinal-compra.wav'),sell:new Audio('/sounds/sinal-venda.wav')};
+Object.values(SND).forEach(a=>{a.preload='auto';a.volume=1});
+function playSignal(dir){const a=dir===-1?SND.sell:SND.buy;try{a.currentTime=0;const p=a.play();if(p&&p.catch)p.catch(()=>beep(true))}catch{beep(true)}}
 function beep(strong){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const t=audioCtx.currentTime;[0,.18].concat(strong?[.36]:[]).forEach((d,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=strong?880+i*110:660;g.gain.setValueAtTime(.0001,t+d);g.gain.exponentialRampToValueAtTime(.18,t+d+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d+.16);o.connect(g).connect(audioCtx.destination);o.start(t+d);o.stop(t+d+.17)})}catch{}}
 AL.hist=[];try{AL.hist=JSON.parse(localStorage.getItem('smc_al_hist')||'[]')}catch{}
 AL.min=8;try{AL.min=+(localStorage.getItem('smc_al_min')||8)}catch{}
@@ -1219,7 +1224,7 @@ function toast(title,body,sym,dir){
 async function notify(title,body,sym,strong,dir){
   AL.hist.unshift({title,body,sym,dir,at:Date.now()});AL.hist=AL.hist.slice(0,30);
   try{localStorage.setItem('smc_al_hist',JSON.stringify(AL.hist))}catch{}
-  alHistRender();toast(title,body,sym,dir);beep(strong);flashTitle(title);
+  alHistRender();toast(title,body,sym,dir);if(dir===1||dir===-1)playSignal(dir);else beep(false);flashTitle(title);
   if(!canNotify())return;
   const opt={body,tag:sym?'smc-'+sym:'smc',renotify:true,icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',data:{sym},requireInteraction:!!strong};
   try{if(AL.swReg)await AL.swReg.showNotification(title,opt);else{const n=new Notification(title,opt);n.onclick=()=>{window.focus();if(sym)openSym(sym);n.close()}}}catch{try{new Notification(title,opt)}catch{}}
@@ -1329,6 +1334,7 @@ if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
   ping();setInterval(ping,60000);
 }
 $('alBtn').onclick=alToggle;alUI();
+$('alTest').onclick=()=>{playSignal(1);setTimeout(()=>playSignal(-1),1100)};
 $('alMin').value=String(AL.min);$('alMin').onchange=e=>{AL.min=+e.target.value;try{localStorage.setItem('smc_al_min',AL.min)}catch{}};
 alHistRender();
 $('alHistBtn').onclick=()=>{const o=$('alHist').hidden;$('alHist').hidden=!o;$('alHistBtn').setAttribute('aria-expanded',o)};
