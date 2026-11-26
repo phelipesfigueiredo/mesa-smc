@@ -182,6 +182,14 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
 .warn.bad{background:rgba(255,69,58,.14);color:#ff6b61}
 .more summary{cursor:pointer;font:600 .8rem var(--body);color:#8e8e93;padding:4px 0}
 .more .form{margin-top:8px}
+.roi{width:100%;border-collapse:collapse;font:400 .8rem var(--mono);font-variant-numeric:tabular-nums}
+.roi th{font:600 .62rem var(--body);letter-spacing:.08em;text-transform:uppercase;color:#8e8e93;text-align:right;padding:4px 0}
+.roi th:first-child,.roi td:first-child{text-align:left}
+.roi td{text-align:right;padding:7px 0;border-top:1px solid rgba(255,255,255,.07)}
+.roi tr.tot td{font-weight:700;border-top:1px solid rgba(255,255,255,.25)}
+.roi .tag2{display:inline-block;min-width:34px;font:600 .66rem var(--body);padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);text-align:center}
+.split{display:flex;gap:6px;align-items:center;font:500 .72rem var(--body);color:#8e8e93;flex-wrap:wrap}
+.split input{width:54px;padding:4px 6px;border-radius:7px;font:500 .78rem var(--mono)}
 </style>
 </head>
 <body>
@@ -234,6 +242,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opa
       <div class="outcome" id="bgout"></div>
 
       <details class="more"><summary>Mais opções</summary>
+        <div class="split" style="margin:8px 0">Fechar em cada alvo (%):
+          TP1 <input id="sp1" type="number" value="50" min="0" max="100"> TP2 <input id="sp2" type="number" value="30" min="0" max="100"> TP3 <span id="sp3">20</span>%</div>
         <div class="form">
           <label>Margem<select id="bgmargin"><option value="isolated">Isolada (recomendado)</option><option value="crossed">Cruzada</option></select></label>
           <label>Máx. ordens/dia<input id="bgmax" type="number" value="3" min="1" max="10"></label>
@@ -576,7 +586,13 @@ function bgCalc(){
   const loss=notional*(move(P.stop)+fee),gain=notional*(move(P.tp)-fee);
   const liq=P.dir===1?P.entry*(1-1/lev*0.9):P.entry*(1+1/lev*0.9);
   const liqBeforeStop=P.dir===1?liq>=P.stop:liq<=P.stop;
-  return{P,lev,amt,notional,qty,loss,gain,liq,liqBeforeStop};
+  const s1=Math.min(Math.max(+$('sp1').value||0,0),100),s2=Math.min(Math.max(+$('sp2').value||0,0),100-s1),tps=P.tps.slice(0,3);
+  const sh=tps.length===1?[100]:tps.length===2?[s1,100-s1]:[s1,s2,100-s1-s2];
+  $('sp3').textContent=sh[2]??0;
+  const rows=tps.map((t,i)=>{const g=notional*sh[i]/100*(move(t)-fee);return{t,share:sh[i],g,roi:amt?g/amt*100:0}});
+  const total=rows.reduce((a,r)=>a+r.g,0);
+  const be=rows.length?rows[0].g:0; // TP1 e depois stop no breakeven
+  return{P,lev,amt,notional,qty,loss,gain:total,liq,liqBeforeStop,rows,total,be,sh,tps};
 }
 function bgPreview(){
   const c=bgCalc();if(!c)return;const {P}=c;
@@ -590,9 +606,14 @@ function bgPreview(){
   if(!P.active)warns+=`<div class="warn">Sem sinal agora. A ordem só libera quando o card de decisão mostrar compra ou venda.</div>`;
   $('bgout').innerHTML=`<div class="sentence">Vai ${side} <b>${fmt(c.qty,5)} ${esc(P.sym.replace(/USDT$/,''))}</b> em <b>${fmt(P.entry)}</b>, uma posição de <b>US$ ${fmt(c.notional,0)}</b> (US$ ${fmt(c.amt,0)} × ${c.lev}).</div>
    <div class="ogrid">
-    <div class="obox"><small>Se bater o stop</small><b class="bad">−US$ ${fmt(c.loss,2)}</b><span>em ${fmt(P.stop)} · ${fmt(lossPct,2)}% da banca</span></div>
-    <div class="obox"><small>Se bater o alvo</small><b class="ok">+US$ ${fmt(c.gain,2)}</b><span>em ${fmt(P.tp)}</span></div>
-   </div>${warns}`;
+    <div class="obox"><small>Se bater o stop</small><b class="bad">−US$ ${fmt(c.loss,2)}</b><span>ROI −${fmt(c.amt?c.loss/c.amt*100:0,1)}% · ${fmt(lossPct,2)}% da banca</span></div>
+    <div class="obox"><small>Se bater todos os alvos</small><b class="ok">+US$ ${fmt(c.total,2)}</b><span>ROI +${fmt(c.amt?c.total/c.amt*100:0,1)}% sobre US$ ${fmt(c.amt,0)}</span></div>
+   </div>
+   <table class="roi"><thead><tr><th>Alvo</th><th>Preço</th><th>Fecha</th><th>Lucro</th><th>ROI</th></tr></thead><tbody>
+    ${c.rows.map((r,i)=>`<tr><td><span class="tag2">TP${i+1}</span>${i===c.rows.length-1?' <span class="mu">final</span>':''}</td><td>${fmt(r.t)}</td><td>${r.share}%</td><td class="ok">+${fmt(r.g,2)}</td><td>+${fmt(r.roi,1)}%</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td></td><td>100%</td><td class="ok">+${fmt(c.total,2)}</td><td>+${fmt(c.amt?c.total/c.amt*100:0,1)}%</td></tr>
+   </tbody></table>
+   <div class="note" style="color:#8e8e93">ROI sobre a margem alocada (US$ ${fmt(c.amt,0)} com ${c.lev}x), já descontando taxas. Depois do TP1 o stop vai para a entrada: se voltar, o pior caso fica em +US$ ${fmt(c.be,2)}.</div>${warns}`;
   const ok=BG.ok&&P.active&&c.amt>0&&!c.liqBeforeStop&&!(BG.avail!=null&&c.amt>BG.avail);
   $('bgsend').disabled=!ok;
   $('bgsend').textContent=P.active?(P.dir===1?'Comprar':'Vender')+` · US$ ${fmt(c.amt,0)} × ${c.lev}x`:'Enviar ordem';
@@ -615,8 +636,8 @@ async function bgSend(auto){
   if(BG.sent[key])return;
   const cnt=Object.values(BG.sent).filter(d=>d===today).length;if(cnt>=+$('bgmax').value){if(!auto)bglog('Limite diário de ordens atingido');return}
   BG.sent[key]=today;
-  try{const j=await bgcall('order',{mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
-    bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId}`)}
+  try{const j=await bgcall('order',{mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,tps:bgCalc().tps,shares:bgCalc().sh,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
+    bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId} · TP final ${j.finalTp||'-'}${j.partials?.length?' · parciais quando executar: '+j.partials.join(', '):''}`)}
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
 $('bgtest').onclick=bgTest;$('bgsend').onclick=()=>bgSend(false);
@@ -625,6 +646,7 @@ const markQuick=()=>document.querySelectorAll('#bgquick button').forEach(b=>b.se
 $('bgquick').onclick=e=>{const p=e.target.dataset?.p;if(!p)return;amtMode=p;
   if(p==='risk')setRiskAmount();else if(BG.avail!=null)$('bgamt').value=Math.floor(BG.avail*(+p)/100);
   markQuick();bgPreview()};
+$('sp1').oninput=$('sp2').oninput=bgPreview;
 $('bgamt').oninput=()=>{amtMode='';markQuick();bgPreview()};
 $('bglev').oninput=()=>{if(amtMode==='risk')setRiskAmount();bgPreview()};
 const setAcct=m=>{$('bgmode').value=m;$('acDemo').setAttribute('aria-pressed',m==='demo');$('acLive').setAttribute('aria-pressed',m==='live');bgTest()};

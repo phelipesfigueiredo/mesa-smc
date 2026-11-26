@@ -82,8 +82,12 @@ async function placeOrder(o) {
   const mode = o.mode === 'live' ? 'live' : 'demo';
   if (!/^[A-Z0-9]{2,20}USDT$/.test(o.symbol)) throw new Error('Par inválido');
   const side = o.side === 'buy' ? 'buy' : o.side === 'sell' ? 'sell' : null; if (!side) throw new Error('Lado inválido');
-  const price = +o.price, sl = +o.sl, tp = +o.tp, lev = Math.min(Math.max(+o.leverage || 1, 1), 50);
+  const price = +o.price, sl = +o.sl, lev = Math.min(Math.max(+o.leverage || 1, 1), 50);
+  const tps = (Array.isArray(o.tps) ? o.tps : [o.tp]).map(Number).filter(x => x > 0);
+  const shares = (Array.isArray(o.shares) && o.shares.length === tps.length ? o.shares : tps.map((_, i, a) => i === a.length - 1 ? 0 : 0)).map(Number);
+  const tp = tps[tps.length - 1];
   if (!(price > 0 && sl > 0 && tp > 0)) throw new Error('Preços inválidos');
+  if (tps.some(t => side === 'buy' ? !(t > price) : !(t < price))) throw new Error('Algum alvo está do lado errado da entrada');
   if (side === 'buy' ? !(sl < price && tp > price) : !(sl > price && tp < price)) throw new Error('Stop/alvo do lado errado da entrada');
   const st0 = await status(mode);
   if (st0.account === 'none') throw new Error('Saldo zerado em todos os tipos de conta (' + st0.tries.join(' | ') + ')');
@@ -110,8 +114,20 @@ async function placeOrder(o) {
   };
   if (acct?.posMode === 'hedge_mode') body.tradeSide = 'open';
   const r = await bg(mode, 'POST', '/api/v2/mix/order/place-order', null, body);
+  // Alvos parciais: só podem ser criados depois que a entrada for executada. Guardamos e acompanhamos.
+  const partials = [];
+  let left = size;
+  tps.slice(0, -1).forEach((t, i) => {
+    const q = round(size * (shares[i] || 0) / 100, vp);
+    if (q >= min && q < left) { partials.push({ price: roundP(t, pp), size: q, done: false }); left = round(left - q, vp); }
+  });
+  if (partials.length) {
+    WATCH.push({ mode, orderId: r.orderId, symbol: m.symbol, productType: m.productType, marginCoin: m.marginCoin, hedge: acct?.posMode === 'hedge_mode',
+      holdSide: side === 'buy' ? 'long' : 'short', side, entry: +body.price, size, pp, vp, partials, beDone: false, state: 'waiting', created: Date.now() });
+    saveWatch();
+  }
   console.log(new Date().toISOString(), mode.toUpperCase(), side, size, m.symbol, '@', body.price, 'SL', body.presetStopLossPrice, 'TP', body.presetStopSurplusPrice, '→', r.orderId);
-  return { orderId: r.orderId, size, symbol: m.symbol };
+  return { orderId: r.orderId, size, symbol: m.symbol, partials: partials.map(p => `${p.size} @ ${p.price}`), finalTp: body.presetStopSurplusPrice };
 }
 
 
@@ -157,6 +173,65 @@ async function getNews() {
   return newsCache;
 }
 
+
+// ---------- Acompanhamento das ordens: cria TPs parciais quando a entrada é executada e move o stop para o breakeven após o TP1 ----------
+const WATCH_FILE = path.join(__dirname, 'watch.json');
+let WATCH = [];
+try { WATCH = JSON.parse(fs.readFileSync(WATCH_FILE, 'utf8')); } catch {}
+const saveWatch = () => { try { fs.writeFileSync(WATCH_FILE, JSON.stringify(WATCH, null, 2)); } catch {} };
+const wlog = (w, msg) => { const line = `${new Date().toISOString()} [${w.mode}] ${w.symbol} #${w.orderId}: ${msg}`; console.log(line); (w.log = w.log || []).push(line); };
+
+async function positionSize(w) {
+  const d = await bg(w.mode, 'GET', '/api/v2/mix/position/single-position', { symbol: w.symbol, productType: w.productType, marginCoin: w.marginCoin });
+  const p = (d || []).find(x => !w.hedge || x.holdSide === w.holdSide) || {};
+  return +(p.total ?? p.available ?? 0);
+}
+async function tickWatch(w) {
+  if (w.state === 'waiting') {
+    const o = await bg(w.mode, 'GET', '/api/v2/mix/order/detail', { symbol: w.symbol, productType: w.productType, orderId: w.orderId });
+    const st = o?.state || o?.status;
+    if (st === 'canceled' || st === 'cancelled') { w.state = 'closed'; wlog(w, 'entrada cancelada, nada a fazer'); return; }
+    if (st !== 'filled') return;
+    w.state = 'open'; wlog(w, 'entrada executada, criando alvos parciais');
+  }
+  if (w.state === 'open') {
+    for (const p of w.partials) {
+      if (p.orderId) continue;
+      try {
+        const body = { symbol: w.symbol, productType: w.productType, marginCoin: w.marginCoin, planType: 'profit_plan', triggerPrice: String(p.price),
+          triggerType: 'fill_price', executePrice: '0', holdSide: w.hedge ? w.holdSide : w.side, size: String(p.size), clientOid: 'smctp' + Date.now() + Math.floor(Math.random() * 1e3) };
+        const r = await bg(w.mode, 'POST', '/api/v2/mix/order/place-tpsl-order', null, body);
+        p.orderId = r?.orderId || 'ok'; wlog(w, `TP parcial criado: fecha ${p.size} em ${p.price}`);
+      } catch (e) { wlog(w, `falha ao criar TP parcial em ${p.price}: ${e.message}`); }
+    }
+    w.state = 'managing';
+  }
+  if (w.state === 'managing') {
+    const pos = await positionSize(w);
+    if (pos <= 0) { w.state = 'closed'; wlog(w, 'posição encerrada'); return; }
+    if (!w.beDone && pos < w.size * 0.999) {
+      // TP1 executado: stop vai para o preço de entrada
+      try {
+        const d = await bg(w.mode, 'GET', '/api/v2/mix/order/orders-plan-pending', { symbol: w.symbol, productType: w.productType, planType: 'profit_loss' });
+        const list = d?.entrustedList || d || [];
+        const sl = list.find(x => /loss/.test(x.planType || '') && (!w.hedge || (x.posSide || x.holdSide || '') === w.holdSide)) || list.find(x => /loss/.test(x.planType || ''));
+        if (!sl) throw new Error('stop não encontrado');
+        await bg(w.mode, 'POST', '/api/v2/mix/order/modify-tpsl-order', null, { orderId: sl.orderId, marginCoin: w.marginCoin, productType: w.productType, symbol: w.symbol,
+          triggerPrice: String(roundP(w.entry, w.pp)), triggerType: 'mark_price', executePrice: '0', size: sl.size || '' });
+        w.beDone = true; wlog(w, `TP1 atingido, stop movido para o breakeven (${w.entry})`);
+      } catch (e) { wlog(w, `não consegui mover o stop para o breakeven: ${e.message}`); w.beDone = true; }
+    }
+  }
+}
+setInterval(async () => {
+  for (const w of WATCH.filter(x => x.state !== 'closed')) {
+    try { await tickWatch(w); } catch (e) { wlog(w, 'erro no acompanhamento: ' + e.message); }
+    if (Date.now() - w.created > 7 * 864e5) w.state = 'closed';
+  }
+  WATCH = WATCH.filter(x => x.state !== 'closed' || Date.now() - x.created < 864e5);
+  saveWatch();
+}, 15000).unref();
+
 // Conta Unificada (UTA) — API V3
 async function placeUta(mode, o, side, price, sl, tp, lev, available) {
   const symbol = o.symbol, category = 'USDT-FUTURES';
@@ -189,6 +264,7 @@ if (require.main === module) http.createServer(async (req, res) => {
     if ((origin && origin !== `http://${host}`) || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(res, 403, { error: 'Origem não permitida' });
     try {
       if (url.pathname === '/api/news') { const n = await getNews(); return send(res, 200, { items: n.data, errors: n.errors, at: n.at }); }
+      if (url.pathname === '/api/bitget/watch') return send(res, 200, WATCH.map(w => ({ symbol: w.symbol, orderId: w.orderId, state: w.state, partials: w.partials, beDone: w.beDone, log: (w.log || []).slice(-5) })));
       if (url.pathname === '/api/bitget/debug') {
         const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo', out = {};
         const q = async (k, m, p, qs) => { try { out[k] = await bg(mode, m, p, qs); } catch (e) { out[k] = 'ERRO: ' + e.message; } };
