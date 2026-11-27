@@ -919,7 +919,7 @@ function engine(c,Hc,Mc,ctx={}){
     let g=(htf.trend===dir?1:0)+(htf.emaDir===dir?1:0);
     sc.push([2,g,`${htfName}: estrutura ${htf.trend===1?'de alta':htf.trend===-1?'de baixa':'indefinida'}, médias ${htf.emaDir===1?'alinhadas para cima':htf.emaDir===-1?'alinhadas para baixo':'cruzadas'}`]);
     if(htf.trend===-dir&&htf.emaDir===-dir)vetos.push(`${htfName} inteiro contra a operação`);
-    if(mtf&&mtf.trend===-dir&&mtf.slope===-dir)vetos.push(`${mtfName} em tendência contrária`);
+    if(mtf&&mtf.trend===-dir&&mtf.slope===-dir&&htf.trend!==dir)vetos.push(`${mtfName} em tendência contrária e ${htfName} sem apoio`);
     // 2) Varredura de liquidez (2): externa vale 2, interna vale 1
     let ext=null;for(let i=n-1;i>=n-25&&i>0&&!ext;i--){for(const lv of extLevels){if(dir===1?c[i].l<lv&&c[i].c>lv:c[i].h>lv&&c[i].c<lv){ext={i,p:lv};break}}}
     const s=dir===1?sw.bull:sw.bear,swp=ext||s;
@@ -947,8 +947,13 @@ function engine(c,Hc,Mc,ctx={}){
     if(!z){z={...ote,kind:'OTE',dir}}
     const entry=dir===1?z.top-(z.top-z.bot)*0.5:z.bot+(z.top-z.bot)*0.5;
     const swingStop=dir===1?Math.min(z.bot,...(swp?[c[swp.i].l]:[])):Math.max(z.top,...(swp?[c[swp.i].h]:[]));
-    const stop=dir===1?swingStop-a*0.3:swingStop+a*0.3;
-    const risk=Math.abs(entry-stop),fee=entry*0.0012;
+    // taxa real: entrada por ordem limitada (maker ~0,02%) + saída a mercado (taker ~0,06%)
+    const fee=entry*0.0008;
+    // stop atrás da estrutura, mas nunca mais curto que 0,9 ATR nem que 6x as taxas (senão o ruído e as taxas tiram você)
+    const minDist=Math.max(a*0.9,fee*6);
+    let stop=dir===1?swingStop-a*0.3:swingStop+a*0.3;
+    if(Math.abs(entry-stop)<minDist)stop=dir===1?entry-minDist:entry+minDist;
+    const risk=Math.abs(entry-stop);
     if(risk<a*0.4)vetos.push('Stop curto demais para a volatilidade atual (ruído pode tirar)');
     if(fee/risk>0.2)vetos.push(`Stop muito próximo: as taxas comeriam ${fmt(fee/risk*100,0)}% do risco`);
     if(risk>a*5)vetos.push('Stop longo demais: risco desproporcional');
