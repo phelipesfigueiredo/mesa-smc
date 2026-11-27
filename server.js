@@ -369,6 +369,7 @@ if (require.main === module) http.createServer(async (req, res) => {
         let raw = ''; for await (const ch of req) { raw += ch; if (raw.length > 4e5) throw new Error('Texto grande demais'); }
         return send(res, 200, { texts: await reader.translate(JSON.parse(raw).texts, 'pt') });
       }
+      if (url.pathname === '/api/market/candles') { const q = url.searchParams; return send(res, 200, await require('./lib/market').candles(String(q.get('symbol') || ''), String(q.get('tf') || ''), +q.get('limit') || 500, q.get('mode') === 'demo' ? 'demo' : 'live')); }
       if (url.pathname === '/api/news') { const n = await getNews(); return send(res, 200, { items: n.data, errors: n.errors, at: n.at }); }
       if (url.pathname === '/api/version') {
         // muda sempre que o app é atualizado (o servidor reinicia ou o index.html muda)
