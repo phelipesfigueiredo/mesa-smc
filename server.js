@@ -385,6 +385,13 @@ if (require.main === module) http.createServer(async (req, res) => {
         return send(res, 200, { stats: journal.stats(mode), guard: journal.guard(mode, ACCT[mode]?.equity || +(ACCT[mode]?.available || 0), 0, openRisk),
           sheets: { configured: !!process.env.SHEETS_WEBHOOK_URL, error: lastSyncErr.sheets || null }, syncError: lastSyncErr[mode] || null });
       }
+      if (url.pathname === '/api/bitget/ticker') {
+        const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo'; await ensureAcct(mode);
+        const sym = String(url.searchParams.get('symbol') || 'BTCUSDT'); if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) throw new Error('Par inválido');
+        const m = market(mode, sym); const t = await pub('/api/v2/mix/market/ticker', { productType: m.productType, symbol: m.symbol });
+        const x = Array.isArray(t) ? t[0] : t;
+        return send(res, 200, { symbol: sym, last: +(x?.lastPr || 0), mark: +(x?.markPrice || x?.indexPrice || 0), bid: +(x?.bidPr || 0), ask: +(x?.askPr || 0) });
+      }
       if (url.pathname === '/api/bitget/limits') {
         const mode = url.searchParams.get('mode') === 'live' ? 'live' : 'demo'; await ensureAcct(mode);
         const sym = String(url.searchParams.get('symbol') || 'BTCUSDT'); if (!/^[A-Z0-9]{2,20}USDT$/.test(sym)) throw new Error('Par inválido');

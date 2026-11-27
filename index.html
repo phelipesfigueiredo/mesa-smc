@@ -547,6 +547,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{bo
 .panel.ink,.verdict{border-color:rgba(0,0,0,.35)!important}
 .bg .money input,:root[data-theme="dark"] .bg .money input{border:0!important;background:transparent!important}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .bg .money input{border:0!important;background:transparent!important}}
+.bxinfo{margin-left:auto;font:600 .72rem var(--mono);color:#0a84ff}
 </style>
 </head>
 <body>
@@ -596,7 +597,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{bo
     <span class="fxm" id="fxvol" hidden></span><span class="fxm" id="fxbtc">BTC em R$ —</span>
   </div></div>
 <div class="main">
-  <div style="display:grid;gap:18px;min-width:0"><div class="panel" style="padding:10px"><div class="tvbar"><span class="symb" id="tvsym">BTCUSDT</span><span class="tvtf" id="tvtf"><button type="button" data-s="scalp">5m</button><button type="button" data-s="day">15m</button><button type="button" data-s="swing">1h</button></span><span class="legend" id="legend"></span></div><div id="chart"></div></div>
+  <div style="display:grid;gap:18px;min-width:0"><div class="panel" style="padding:10px"><div class="tvbar"><span class="symb" id="tvsym">BTCUSDT</span><span class="tvtf" id="tvtf"><button type="button" data-s="scalp">5m</button><button type="button" data-s="day">15m</button><button type="button" data-s="swing">1h</button></span><span class="legend" id="legend"></span><span class="bxinfo" id="bxinfo"></span></div><div id="chart"></div></div>
   <div class="panel news ink"><h2>Notícias que movem o mercado</h2><div class="movers" id="movers"><div class="mu">carregando…</div></div><div class="subh">Últimas <span id="newsmeta" style="text-transform:none;letter-spacing:0;font-weight:400"></span></div><ul id="news"></ul></div>
     <div class="panel gray"><h2><span data-tip="Checklist do método SMC. Cada item cumprido soma pontos. 8 ou mais: setup forte. 6 ou 7: operar com metade do risco. Abaixo de 6: não operar.">Por que esse sinal? Checklist</span></h2><div class="bar"><i id="scorebar" style="width:0"></i></div><div class="list" id="checks" style="margin-top:8px"></div></div>
     <div class="panel gray"><h2><span data-tip="Roda as mesmas regras do motor nos últimos ~3.000 candles desta moeda e tempo, sem olhar o futuro, e mostra como teriam se saído.">Validação das regras no histórico</span></h2>
@@ -1266,7 +1267,8 @@ function bgPreview(){
   if(lossPct>rp*1.0001&&cap)warns+=`<div class="warn">Se bater o stop, a perda (${fmt(lossPct,2)}% do capital) passa do seu risco de ${fmt(rp,1)}%. Toque em "Pelo risco" para ajustar.</div>`;
   if(typeof JR!=='undefined'&&JR.blocked)warns+=`<div class="warn bad">🔒 Trava de proteção ativa: ${esc(JR.data.guard.blocks.filter(b=>b.code!=='risco').map(b=>b.msg).join(' '))}</div>`;
   if(!P.active)warns+=`<div class="warn">Sem sinal agora. A ordem só libera quando o card de decisão mostrar compra ou venda.</div>`;
-  $('bgout').innerHTML=`<div class="sentence">Vai ${side} <b>${fmt(c.qty,5)} ${esc(P.sym.replace(/USDT$/,''))}</b> em <b>${fmt(P.entry)}</b>, uma posição de <b>US$ ${fmt(c.notional,0)}</b> (US$ ${fmt(c.amt,0)} × ${c.lev}).</div>
+  const bxOk=BX.sym===P.sym&&Date.now()-BX.at<60000&&Math.abs(BX.basis-1)>0.0002;
+  $('bgout').innerHTML=`${bxOk?`<div class="warn" style="color:#0a84ff;background:rgba(10,132,255,.1)">Preço na Bitget ${fmt(BX.last)} está ${BX.basis>=1?'+':''}${fmt((BX.basis-1)*100,2)}% em relação ao gráfico. A ordem vai ajustada: entrada ${fmt(bx(P.entry))}, stop ${fmt(bx(P.stop))}, TP1 ${fmt(bx(P.tps[0]))}.</div>`:''}<div class="sentence">Vai ${side} <b>${fmt(c.qty,5)} ${esc(P.sym.replace(/USDT$/,''))}</b> em <b>${fmt(P.entry)}</b>, uma posição de <b>US$ ${fmt(c.notional,0)}</b> (US$ ${fmt(c.amt,0)} × ${c.lev}).</div>
    <div class="ogrid">
     <div class="obox"><small>Se bater o stop</small><b class="bad">−US$ ${fmt(c.loss,2)}</b><span>ROI −${fmt(c.amt?c.loss/c.amt*100:0,1)}% · ${fmt(lossPct,2)}% da banca</span></div>
     <div class="obox"><small>Se bater todos os alvos</small><b class="ok">+US$ ${fmt(c.total,2)}</b><span>ROI +${fmt(c.amt?c.total/c.amt*100:0,1)}% sobre US$ ${fmt(c.amt,0)}</span></div>
@@ -1288,7 +1290,7 @@ function setRiskAmount(){
 async function bgTest(){
   if(!onServer){$('bgconn').textContent='offline';return}
   try{const j=await bgcall('status?mode='+$('bgmode').value);BG.ok=true;BG.avail=+j.available;if(amtMode==='risk')setRiskAmount();$('bgavail').textContent='saldo US$ '+fmt(BG.avail,2);$('bgconn').textContent=($('bgmode').value==='demo'?'DEMO':'REAL')+' · conectado';$('bgconn').className='pill2 ok';$('bgauto').disabled=false;
-    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);LEV.sym=null;loadLevLimit();setTimeout(jrLoad,800);}
+    $('bghint').innerHTML=`Saldo disponível: ${fmt(+j.available,2)} USDT · conta ${j.account==='uta'?'Unificada (UTA)':j.account==='v2'?'clássica':'sem saldo encontrado'}.`+(j.account==='none'?` <a href="/api/bitget/debug?mode=${$('bgmode').value}" target="_blank" style="color:inherit;text-decoration:underline">Ver resposta da Bitget</a>`:'');bglog('Conexão OK · '+(j.tries||[]).join(' | '));setTimeout(bgOpenLoad,300);LEV.sym=null;loadLevLimit();setTimeout(loadBitgetPx,1200);setTimeout(jrLoad,800);}
   catch(e){BG.ok=false;$('bgconn').textContent='erro';$('bgconn').className='pill2 bad';$('bghint').textContent='Falha: '+e.message;bglog('Erro: '+e.message)}
   bgPreview();
 }
@@ -1298,11 +1300,25 @@ async function bgSend(auto){
   if(BG.sent[key])return;
   const cnt=Object.values(BG.sent).filter(d=>d===today).length;if(cnt>=+$('bgmax').value){if(!auto)bglog('Limite diário de ordens atingido');return}
   BG.sent[key]=today;
-  try{const j=await bgcall('order',{score:P.score,tf:$('tf').value,auto:!!auto,mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:P.entry,size:bgCalc().qty,sl:P.stop,tp:P.tp,tps:bgCalc().tps,shares:bgCalc().sh,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
+  if(BX.sym!==P.sym||Date.now()-BX.at>60000){await loadBitgetPx()}
+  try{const j=await bgcall('order',{score:P.score,tf:$('tf').value,auto:!!auto,mode:$('bgmode').value,symbol:P.sym,side:P.dir===1?'buy':'sell',price:bx(P.entry),size:bgCalc().qty,sl:bx(P.stop),tp:bx(P.tp),tps:bgCalc().tps.map(bx),shares:bgCalc().sh,leverage:+$('bglev').value,marginMode:$('bgmargin').value});
     bglog(`${auto?'AUTO ':''}Ordem enviada: ${P.dir===1?'LONG':'SHORT'} ${fmt(j.size,5)} @ ${fmt(P.entry)} · id ${j.orderId} · TP final ${j.finalTp||'-'}${j.partials?.length?' · parciais quando executar: '+j.partials.join(', '):''}`);setTimeout(bgOpenLoad,1200)}
   catch(e){delete BG.sent[key];bglog('Ordem recusada: '+e.message)}
 }
 $('bgtest').onclick=bgTest;
+/* ---------- preço da Bitget x preço do gráfico (Binance spot) ---------- */
+const BX={sym:null,last:0,basis:1,at:0,line:null};
+async function loadBitgetPx(){
+  if(!BG.ok||!C.length)return;const sym=$('sym').value.trim().toUpperCase();
+  try{const j=await bgcall(`ticker?mode=${$('bgmode').value}&symbol=${sym}`);if(!(j.last>0))return;
+    if(sym!==$('sym').value.trim().toUpperCase())return;
+    const ref=C.at(-1).c;BX.sym=sym;BX.last=j.last;BX.basis=j.last/ref;BX.at=Date.now();
+    $('bxinfo').textContent=`Bitget ${fmt(j.last)} · ${BX.basis>=1?'+':''}${fmt((BX.basis-1)*100,2)}% vs gráfico`;
+    if(typeof drawOrderLines==='function')drawOrderLines();bgPreview();
+  }catch{}
+}
+setInterval(()=>{if(!document.hidden)loadBitgetPx()},5000);
+const bx=v=>BX.sym===$('sym').value.trim().toUpperCase()&&Date.now()-BX.at<60000?v*BX.basis:v;
 /* ---------- diário e travas ---------- */
 const JR={data:null,blocked:false};
 async function jrLoad(force){
@@ -1379,7 +1395,8 @@ let orderLines=[];
 function drawOrderLines(){
   orderLines.forEach(l=>cs.removePriceLine(l));orderLines=[];
   const d=OPEN.data,sym=$('sym').value.trim().toUpperCase();if(!d)return;
-  const add=(price,color,title,style=2)=>{if(price>0)orderLines.push(cs.createPriceLine({price,color,title,lineStyle:style,lineWidth:2,axisLabelVisible:true}))};
+  const k=(typeof BX!=='undefined'&&BX.sym===sym&&BX.basis>0)?BX.basis:1;
+  const add=(price,color,title,style=2)=>{if(price>0)orderLines.push(cs.createPriceLine({price:price/k,color,title:title+(k!==1?` ${fmt(price)}`:''),lineStyle:style,lineWidth:2,axisLabelVisible:true}))};
   d.orders.filter(o=>o.symbol===sym).forEach(o=>{
     add(o.price,'#0a84ff','ORDEM BITGET',0);add(o.sl,'#ff453a','SL BITGET');add(o.tp,'#30d158','TP FINAL BITGET');
     const w=(OPEN.watch||[]).find(x=>x.orderId===o.orderId);(w?.partials||[]).forEach((p,i)=>add(p.price,'#30d158',`TP${i+1} (ao executar)`,3));
@@ -1471,6 +1488,7 @@ async function start(){
   chart.applyOptions({watermark:{text:sym+' · '+cfg.ltf}});$('tvsym').textContent=sym;document.querySelectorAll('#tvtf button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===$('tf').value));
   CUR_SYM=sym;resetChartFor(sym,C.at(-1).c);
   if(typeof loadLevLimit==='function'){LEV.sym=null;loadLevLimit()}
+  if(typeof BX!=='undefined'){BX.sym=null;if(BX.line)try{cs.removePriceLine(BX.line)}catch{};BX.line=null;setTimeout(loadBitgetPx,1500)}
   cs.setData(C.map(k=>({time:k.t,open:k.o,high:k.h,low:k.l,close:k.c})));
   vs.setData(C.map(k=>({time:k.t,value:k.v,color:k.c>=k.o?TH.vu:TH.vd})));
   chart.timeScale().setVisibleLogicalRange({from:Math.max(0,C.length-160),to:C.length+8});legend(C.at(-1));
